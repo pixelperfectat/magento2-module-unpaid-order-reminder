@@ -76,11 +76,21 @@ class ReminderSender implements ReminderSenderInterface
                 ->setTemplateOptions(['area' => Area::AREA_FRONTEND, 'store' => $storeId])
                 ->setTemplateVars([
                     'order' => $order,
-                    'instructions' => $instructions,
                     'store_id' => $storeId,
-                    // Magento's StrictResolver only resolves template method calls whose name
-                    // starts with "get", so hasStructuredBankDetails() can never be called
-                    // directly from the template; it must be precomputed here.
+                    // Magento's StrictResolver only exposes property/method access on a
+                    // DataObject, an AbstractTemplate, or an array (shouldHandleDataAccess()) -
+                    // and only then does it further require the method name to start with "get"
+                    // (handleDataAccess()). PaymentInstructions is a plain typed value object, so
+                    // it satisfies neither gate: every instructions.getXxx() call in the template
+                    // would silently resolve to null. Every field the template needs is therefore
+                    // flattened into its own scalar variable here. $order is unaffected - Order
+                    // extends AbstractModel, which is a DataObject.
+                    'instructionsHtml' => (string)$instructions->getInstructionsHtml(),
+                    'bankName' => (string)$instructions->getBankName(),
+                    'bankAccount' => (string)$instructions->getBankAccount(),
+                    'bankBic' => (string)$instructions->getBankBic(),
+                    'paymentReference' => (string)$instructions->getReference(),
+                    'paymentUrl' => (string)$instructions->getPaymentUrl(),
                     'hasBankDetails' => $instructions->hasStructuredBankDetails(),
                     'formattedTotal' => $this->priceCurrency->format(
                         (float)$order->getGrandTotal(),

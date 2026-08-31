@@ -3,13 +3,12 @@
 "var order.increment_id":"Order Number",
 "var order.customer_firstname":"Customer First Name",
 "var hasBankDetails":"Whether structured bank details are available",
-"var instructions.getBankName()":"Bank name",
-"var instructions.getBankAccount()":"Account number",
-"var instructions.getBankBic()":"BIC",
-"var instructions.getReference()":"Payment reference",
-"var instructions.getInstructionsHtml()":"Payment instructions",
-"var instructions.getExpiresAt()":"Payment deadline",
-"var instructions.getPaymentUrl()":"Payment page",
+"var bankName":"Bank name",
+"var bankAccount":"Account number",
+"var bankBic":"BIC",
+"var paymentReference":"Payment reference",
+"var instructionsHtml":"Payment instructions",
+"var paymentUrl":"Payment page",
 "var formattedTotal":"Order total, formatted in the order's currency",
 "var formattedDeadline":"Payment deadline, formatted in the store's timezone"
 } @-->
@@ -24,28 +23,28 @@
 
 {{depend hasBankDetails}}
 <table class="message-details">
-    <tr><th>{{trans "Bank"}}</th><td>{{var instructions.getBankName()}}</td></tr>
-    <tr><th>{{trans "Account"}}</th><td>{{var instructions.getBankAccount()}}</td></tr>
-    {{depend instructions.getBankBic()}}
-    <tr><th>{{trans "BIC"}}</th><td>{{var instructions.getBankBic()}}</td></tr>
+    <tr><th>{{trans "Bank"}}</th><td>{{var bankName}}</td></tr>
+    <tr><th>{{trans "Account"}}</th><td>{{var bankAccount}}</td></tr>
+    {{depend bankBic}}
+    <tr><th>{{trans "BIC"}}</th><td>{{var bankBic}}</td></tr>
     {{/depend}}
-    <tr><th>{{trans "Reference"}}</th><td><strong>{{var instructions.getReference()}}</strong></td></tr>
+    <tr><th>{{trans "Reference"}}</th><td><strong>{{var paymentReference}}</strong></td></tr>
     <tr><th>{{trans "Amount"}}</th><td>{{var formattedTotal}}</td></tr>
 </table>
 <p>{{trans "Please quote the reference exactly. Without it the payment cannot be matched to your order."}}</p>
 {{/depend}}
 
-{{depend instructions.getInstructionsHtml()}}
-<div class="payment-instructions">{{var instructions.getInstructionsHtml()}}</div>
+{{depend instructionsHtml}}
+<div class="payment-instructions">{{var instructionsHtml}}</div>
 <p>{{trans "Please quote order number %increment_id with your payment." increment_id=$order.increment_id}}</p>
 {{/depend}}
 
-{{depend instructions.getExpiresAt()}}
+{{depend formattedDeadline}}
 <p><strong>{{trans "Please pay by %deadline. After that the order can no longer be completed." deadline=$formattedDeadline}}</strong></p>
 {{/depend}}
 
-{{depend instructions.getPaymentUrl()}}
-<p><a href="{{var instructions.getPaymentUrl()}}">{{trans "View the payment details"}}</a></p>
+{{depend paymentUrl}}
+<p><a href="{{var paymentUrl}}">{{trans "View the payment details"}}</a></p>
 {{/depend}}
 
 <p>{{trans "If you have already paid, please ignore this message."}}</p>

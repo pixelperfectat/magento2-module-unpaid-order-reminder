@@ -111,21 +111,52 @@ class ReminderSenderTest extends TestCase
         $this->sender->send($this->order(), $this->instructions(), $this->rule('tpl'));
     }
 
-    public function testPassesTheOrderInstructionsAndStoreToTheTemplate(): void
+    public function testPassesTheOrderAndStoreIdToTheTemplate(): void
     {
-        $instructions = $this->instructions();
         $order = $this->order();
 
         $this->transportBuilder->expects($this->once())
             ->method('setTemplateVars')
-            ->with($this->callback(static function (array $vars) use ($order, $instructions): bool {
+            ->with($this->callback(static function (array $vars) use ($order): bool {
                 return $vars['order'] === $order
-                    && $vars['instructions'] === $instructions
                     && $vars['store_id'] === 7;
             }))
             ->willReturnSelf();
 
-        $this->sender->send($order, $instructions, $this->rule('tpl'));
+        $this->sender->send($order, $this->instructions(), $this->rule('tpl'));
+    }
+
+    /**
+     * Magento's StrictResolver::shouldHandleDataAccess() only allows property/method access on a
+     * DataObject, an AbstractTemplate, or an array. PaymentInstructions is a plain typed value
+     * object and satisfies none of those, so instructions.getXxx() would silently resolve to null
+     * in the template. Every field the template needs is therefore flattened into its own scalar
+     * variable here - not the instructions object itself, which is dropped from the variables.
+     */
+    public function testFlattensPaymentInstructionsIntoScalarTemplateVariables(): void
+    {
+        $instructions = $this->createMock(PaymentInstructionsInterface::class);
+        $instructions->method('getInstructionsHtml')->willReturn('<p>Pay within 7 days.</p>');
+        $instructions->method('getBankName')->willReturn('Example Bank');
+        $instructions->method('getBankAccount')->willReturn('AT00 0000 0000 0000 0000');
+        $instructions->method('getBankBic')->willReturn('EXAMPLEATXXX');
+        $instructions->method('getReference')->willReturn('ORDER-900');
+        $instructions->method('getPaymentUrl')->willReturn('https://example.com/pay/900');
+
+        $this->transportBuilder->expects($this->once())
+            ->method('setTemplateVars')
+            ->with($this->callback(static function (array $vars): bool {
+                return !array_key_exists('instructions', $vars)
+                    && $vars['instructionsHtml'] === '<p>Pay within 7 days.</p>'
+                    && $vars['bankName'] === 'Example Bank'
+                    && $vars['bankAccount'] === 'AT00 0000 0000 0000 0000'
+                    && $vars['bankBic'] === 'EXAMPLEATXXX'
+                    && $vars['paymentReference'] === 'ORDER-900'
+                    && $vars['paymentUrl'] === 'https://example.com/pay/900';
+            }))
+            ->willReturnSelf();
+
+        $this->sender->send($this->order(), $instructions, $this->rule('tpl'));
     }
 
     public function testAddsEveryConfiguredBccAddress(): void
@@ -223,6 +254,78 @@ class ReminderSenderTest extends TestCase
             ->willReturnSelf();
 
         $this->sender->send($this->order(), $instructions, $this->rule('tpl'));
+    }
+
+    /**
+     * Closes the gap named in code review: nothing previously proved the template and the sender
+     * agree on variable names. Every plain (non-dotted) variable the template references - via
+     * {{var x}}, {{depend x}}, or $x used as a directive argument - must be a key the sender
+     * actually passes, or the template would silently render nothing for it.
+     */
+    public function testEveryPlainTemplateVariableIsPassedBySender(): void
+    {
+        $path = __DIR__ . '/../../../view/frontend/email/unpaid_order_reminder.html';
+        $this->assertFileExists($path);
+        $contents = (string)file_get_contents($path);
+
+        $names = [];
+        preg_match_all('/\{\{var\s+([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/', $contents, $matches);
+        $names = array_merge($names, $matches[1]);
+        preg_match_all('/\{\{depend\s+([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/', $contents, $matches);
+        $names = array_merge($names, $matches[1]);
+        preg_match_all('/\$([A-Za-z_][A-Za-z0-9_]*)(\.[A-Za-z_][A-Za-z0-9_]*)?/', $contents, $matches);
+        foreach ($matches[1] as $index => $name) {
+            if ($matches[2][$index] === '') {
+                $names[] = $name;
+            }
+        }
+        $names = array_unique($names);
+
+        $this->assertNotEmpty($names, 'Expected the template to reference at least one plain variable.');
+
+        // A dedicated mock, rather than $this->transportBuilder: setUp() already registers an
+        // unconstrained setTemplateVars() stub on that one, and PHPUnit resolves a stubbed
+        // return value from the first matching stub, so a second stub added here would never
+        // actually run.
+        $transportBuilder = $this->createMock(TransportBuilder::class);
+        $transportBuilder->method('setTemplateIdentifier')->willReturnSelf();
+        $transportBuilder->method('setTemplateOptions')->willReturnSelf();
+        $transportBuilder->method('setFromByScope')->willReturnSelf();
+        $transportBuilder->method('addTo')->willReturnSelf();
+        $transportBuilder->method('addBcc')->willReturnSelf();
+        $transportBuilder->method('getTransport')->willReturn($this->transport);
+
+        $vars = null;
+        $transportBuilder->method('setTemplateVars')
+            ->willReturnCallback(function (array $templateVars) use (&$vars, $transportBuilder) {
+                $vars = $templateVars;
+
+                return $transportBuilder;
+            });
+
+        $sender = new ReminderSender(
+            $transportBuilder,
+            $this->emulation,
+            $this->config,
+            $this->senderResolver,
+            $this->priceCurrency,
+            $this->timezone
+        );
+
+        $instructions = $this->createMock(PaymentInstructionsInterface::class);
+        $sender->send($this->order(), $instructions, $this->rule('tpl'));
+
+        $this->assertIsArray($vars);
+        $missing = array_values(array_filter(
+            $names,
+            static fn (string $name): bool => !array_key_exists($name, $vars)
+        ));
+
+        $this->assertSame(
+            [],
+            $missing,
+            'The template references a variable the sender never passes: ' . implode(', ', $missing)
+        );
     }
 
     private function order(): OrderInterface

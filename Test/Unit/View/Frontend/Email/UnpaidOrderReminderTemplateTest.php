@@ -6,27 +6,46 @@ namespace PixelPerfect\UnpaidOrderReminder\Test\Unit\View\Frontend\Email;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Guards against a class of bug found in code review: Magento's
- * Magento\Framework\Filter\VariableResolver\StrictResolver::handleDataAccess() only resolves a
- * template method call whose name starts with "get" (it checks `substr($name, 0, 3) == 'get'`).
- * A call to any other method - e.g. instructions.hasStructuredBankDetails() - silently resolves
- * to null, so a {{depend}} guarded by it is always false and the guarded block never renders,
- * with no error anywhere. Any such value must be precomputed in PHP and passed in as a plain
- * template variable instead.
+ * Guards against a two-layer bug found in code review.
+ *
+ * Magento\Framework\Filter\VariableResolver\StrictResolver gates template member access twice:
+ * shouldHandleDataAccess() first allows only a DataObject, an AbstractTemplate, or an array as the
+ * left-hand side, and only then does handleDataAccess() further require a method name starting
+ * with "get". PaymentInstructions is a plain typed value object - it is not a DataObject, not an
+ * AbstractTemplate, and not an array - so it fails the first gate regardless of method name: every
+ * `instructions.getXxx()` call in the template silently resolves to null, not only a non-"get"
+ * one. `order.*` is unaffected because Order extends AbstractModel, which is a DataObject.
+ *
+ * The fix is to precompute every instructions field in PHP and pass it as its own scalar template
+ * variable, never the instructions object itself. These two checks guard against reintroducing
+ * either layer of the bug, in this template or a later one.
  */
 class UnpaidOrderReminderTemplateTest extends TestCase
 {
+    public function testTemplateNeverAccessesTheInstructionsObjectDirectly(): void
+    {
+        $this->assertFileExists($this->templatePath());
+        $contents = (string)file_get_contents($this->templatePath());
+
+        $this->assertStringNotContainsString(
+            'instructions.',
+            $contents,
+            'The instructions object fails StrictResolver::shouldHandleDataAccess() (it is not a '
+            . 'DataObject, an AbstractTemplate, or an array), so any instructions.* access would '
+            . 'silently resolve to null. Every instructions field must be passed as its own '
+            . 'precomputed scalar template variable instead.'
+        );
+    }
+
     public function testTemplateCallsNoMethodWhoseNameDoesNotStartWithGet(): void
     {
-        $path = __DIR__ . '/../../../../../view/frontend/email/unpaid_order_reminder.html';
-        $this->assertFileExists($path);
+        $contents = (string)file_get_contents($this->templatePath());
 
-        $contents = (string)file_get_contents($path);
-
+        // order.* is exempt: Order extends AbstractModel, which satisfies the DataObject gate,
+        // so its getters DO resolve - this check is only about the get-prefix requirement that
+        // applies once that first gate is passed.
         preg_match_all('/\b[A-Za-z_][A-Za-z0-9_]*\.([A-Za-z_][A-Za-z0-9_]*)\(\)/', $contents, $matches);
         $methodNames = $matches[1];
-
-        $this->assertNotEmpty($methodNames, 'Expected the template to contain at least one method call.');
 
         $offenders = array_values(array_filter(
             $methodNames,
@@ -39,5 +58,10 @@ class UnpaidOrderReminderTemplateTest extends TestCase
             'Magento\'s StrictResolver only resolves template method calls starting with "get"; '
             . 'found a call that would silently resolve to null: ' . implode(', ', $offenders)
         );
+    }
+
+    private function templatePath(): string
+    {
+        return __DIR__ . '/../../../../../view/frontend/email/unpaid_order_reminder.html';
     }
 }
