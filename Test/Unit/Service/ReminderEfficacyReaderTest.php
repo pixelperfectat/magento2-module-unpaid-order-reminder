@@ -6,6 +6,7 @@ namespace PixelPerfect\UnpaidOrderReminder\Test\Unit\Service;
 use Magento\Framework\DB\Adapter\AdapterInterface;
 use Magento\Framework\DB\Select;
 use Magento\Framework\Model\ResourceModel\Db\AbstractDb;
+use PDO;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use PixelPerfect\UnpaidOrderReminder\Model\Data\ReminderEfficacy;
@@ -88,7 +89,68 @@ class ReminderEfficacyReaderTest extends TestCase
 
         $this->reader()->read();
 
-        $this->assertStringContainsString('so.updated_at > pp.sent_at', (string)$captured['paid_count']);
+        $this->assertStringContainsString('so.updated_at >= pp.sent_at', (string)$captured['paid_count']);
+    }
+
+    /**
+     * The three outcome groups must partition the reminded population: their counts always sum to
+     * the reminded count. This executes the reader's own generated SQL condition fragments — not a
+     * reimplementation of them — against a fixture that includes an order whose updated_at lands in
+     * the very same second as its reminder's sent_at, the boundary the paid/orphan gap closed.
+     */
+    public function testTheThreeGroupsSumToTheRemindedCountIncludingAnEqualTimestamp(): void
+    {
+        $captured = [];
+        $this->select->method('columns')->willReturnCallback(
+            function (array $columns) use (&$captured): Select {
+                $captured = $columns;
+                return $this->select;
+            }
+        );
+        $this->connection->method('fetchRow')->willReturn(false);
+        $this->reader()->read();
+
+        $pdo = new PDO('sqlite::memory:');
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        // The expired branch calls MySQL's UTC_TIMESTAMP(); give SQLite the same fixed "now".
+        $pdo->sqliteCreateFunction('UTC_TIMESTAMP', static fn (): string => '2026-08-31 12:00:00', 0);
+
+        $pdo->exec('CREATE TABLE pp (order_id INTEGER, sent_at TEXT, expires_at TEXT)');
+        $pdo->exec('CREATE TABLE so (entity_id INTEGER, state TEXT, updated_at TEXT)');
+        $insertPp = $pdo->prepare('INSERT INTO pp (order_id, sent_at, expires_at) VALUES (?, ?, ?)');
+        $insertSo = $pdo->prepare('INSERT INTO so (entity_id, state, updated_at) VALUES (?, ?, ?)');
+
+        // 1: paid at the exact same second the reminder was stamped - the boundary this fix closes.
+        // 2: still pending, no expiry.       3: pending, past its expiry.      4: cancelled.
+        $fixture = [
+            [1, '2026-08-01 10:00:00', null, 'processing', '2026-08-01 10:00:00'],
+            [2, '2026-08-01 10:00:00', null, 'pending_payment', '2026-08-01 10:00:00'],
+            [3, '2026-08-01 10:00:00', '2026-08-05 00:00:00', 'pending_payment', '2026-08-01 10:00:00'],
+            [4, '2026-08-01 10:00:00', null, 'canceled', '2026-08-01 10:00:00'],
+        ];
+        foreach ($fixture as [$orderId, $sentAt, $expiresAt, $state, $updatedAt]) {
+            $insertPp->execute([$orderId, $sentAt, $expiresAt]);
+            $insertSo->execute([$orderId, $state, $updatedAt]);
+        }
+
+        $sql = sprintf(
+            'SELECT %s AS reminded_count, %s AS paid_count, %s AS still_unpaid_count, %s AS expired_count'
+            . ' FROM pp JOIN so ON so.entity_id = pp.order_id',
+            (string)$captured['reminded_count'],
+            (string)$captured['paid_count'],
+            (string)$captured['still_unpaid_count'],
+            (string)$captured['expired_count']
+        );
+        $result = $pdo->query($sql)->fetch(PDO::FETCH_ASSOC);
+
+        $this->assertSame(4, (int)$result['reminded_count']);
+        $this->assertSame(1, (int)$result['paid_count'], 'the same-second payment must count as paid');
+        $this->assertSame(1, (int)$result['still_unpaid_count']);
+        $this->assertSame(2, (int)$result['expired_count']);
+        $this->assertSame(
+            (int)$result['reminded_count'],
+            (int)$result['paid_count'] + (int)$result['still_unpaid_count'] + (int)$result['expired_count']
+        );
     }
 
     public function testRestrictsToRemindersSentSinceTheGivenMoment(): void

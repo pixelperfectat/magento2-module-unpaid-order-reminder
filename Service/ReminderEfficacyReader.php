@@ -44,9 +44,13 @@ class ReminderEfficacyReader implements ReminderEfficacyReaderInterface
         $pending = $connection->quote(Order::STATE_PENDING_PAYMENT);
         $canceled = $connection->quote(Order::STATE_CANCELED);
 
-        // Paid: the order has left pending payment, and did so after the mail went out. An order
-        // already paid when the reminder was written is not credited to it.
-        $paid = sprintf('(so.state NOT IN (%s, %s) AND so.updated_at > pp.sent_at)', $pending, $canceled);
+        // Paid: the order has left pending payment, and did so at or after the mail went out. Both
+        // columns are whole-second DATETIME, and sent_at is now stamped before the send (see
+        // ReminderRunner::processOrder()), so any post-reminder state change has an updated_at no
+        // earlier than sent_at by construction; the equal case is the one that remains genuinely
+        // possible within a second. An order paid a meaningful margin before the reminder was
+        // written is not credited to it.
+        $paid = sprintf('(so.state NOT IN (%s, %s) AND so.updated_at >= pp.sent_at)', $pending, $canceled);
         $stillUnpaid = sprintf(
             '(so.state = %s AND (pp.expires_at IS NULL OR pp.expires_at > UTC_TIMESTAMP()))',
             $pending

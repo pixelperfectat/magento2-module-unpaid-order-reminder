@@ -266,6 +266,31 @@ class ReminderRunnerTest extends TestCase
         $this->assertSame(0, $result->getSkippedCount());
     }
 
+    /**
+     * sent_at must be captured before the send, not after: a payment webhook racing the mail-send
+     * must never be able to land with an updated_at earlier than sent_at. See
+     * ReminderEfficacyReaderTest::testTheThreeGroupsSumToTheRemindedCountIncludingAnEqualTimestamp()
+     * for why that ordering is what makes the efficacy partition exhaustive.
+     */
+    public function testStampsSentAtBeforeSendingRatherThanAfter(): void
+    {
+        $order = [];
+        $dateTime = $this->createMock(DateTime::class);
+        $dateTime->method('gmtDate')->willReturnCallback(static function () use (&$order): string {
+            $order[] = 'stamped';
+            return '2026-08-31 10:00:00';
+        });
+        $dateTime->method('gmtTimestamp')->willReturn(1788170400);
+
+        $this->sender->method('send')->willReturnCallback(static function () use (&$order): void {
+            $order[] = 'sent';
+        });
+
+        $this->runner(null, null, $dateTime)->run();
+
+        $this->assertSame(['stamped', 'sent'], $order);
+    }
+
     public function testFreezesTheOrderTotalAndExpiryOnTheLogRow(): void
     {
         $log = $this->createMock(ReminderLog::class);
@@ -282,10 +307,14 @@ class ReminderRunnerTest extends TestCase
     /**
      * @param ReminderLog|null $log
      * @param LoggerInterface|null $logger
+     * @param DateTime|null $dateTime
      * @return ReminderRunner
      */
-    private function runner(?ReminderLog $log = null, ?LoggerInterface $logger = null): ReminderRunner
-    {
+    private function runner(
+        ?ReminderLog $log = null,
+        ?LoggerInterface $logger = null,
+        ?DateTime $dateTime = null
+    ): ReminderRunner {
         $criterion = $this->createMock(ReminderCriterionInterface::class);
 
         $collectionFactory = $this->createMock(UnpaidCollectionFactory::class);
@@ -299,9 +328,11 @@ class ReminderRunnerTest extends TestCase
             static fn (array $data = []): ReminderRunResult => new ReminderRunResult(...$data)
         );
 
-        $dateTime = $this->createMock(DateTime::class);
-        $dateTime->method('gmtDate')->willReturn('2026-08-31 10:00:00');
-        $dateTime->method('gmtTimestamp')->willReturn(1788170400);
+        if ($dateTime === null) {
+            $dateTime = $this->createMock(DateTime::class);
+            $dateTime->method('gmtDate')->willReturn('2026-08-31 10:00:00');
+            $dateTime->method('gmtTimestamp')->willReturn(1788170400);
+        }
 
         return new ReminderRunner(
             $this->config,

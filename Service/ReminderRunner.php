@@ -188,6 +188,11 @@ class ReminderRunner implements ReminderRunnerInterface
             return $row;
         }
 
+        // Stamped before the send, not after: this is the moment the reminder cycle for this order
+        // began, and it guarantees any state change the send itself could race with (a payment
+        // webhook landing while the mail is in flight) has an updated_at no earlier than this value.
+        $sentAt = (string)$this->dateTime->gmtDate(self::MYSQL_DATETIME);
+
         try {
             $this->sender->send($current, $instructions, $rules[$method]);
         } catch (Throwable $e) {
@@ -206,7 +211,7 @@ class ReminderRunner implements ReminderRunnerInterface
             $log->setOrderId($orderId)
                 ->setStoreId((int)$current->getStoreId())
                 ->setPaymentMethod($method)
-                ->setSentAt((string)$this->dateTime->gmtDate(self::MYSQL_DATETIME))
+                ->setSentAt($sentAt)
                 ->setExpiresAt($expiresAt)
                 ->setGrandTotal((float)$current->getGrandTotal());
             $this->logRepository->save($log);

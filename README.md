@@ -52,6 +52,13 @@ bin/magento pixelperfect:unpaidorder:reminder-stats
 
 A cron job runs the same code daily.
 
+`reminder-stats` reports four groups: reminded, paid, still unpaid, and expired unpaid. The expired
+group also fires for a reminder whose payment window closed without payment — but the offline
+providers this package ships (bank transfer, check/money order, cash on delivery, purchase order)
+never set an expiry, so out of the box that branch is dormant and every expired row comes from an
+order that was cancelled. A provider that does set an expiry (see the Mollie companion package) will
+start populating it.
+
 ## Adding a payment method
 
 Implement `PixelPerfect\UnpaidOrderReminder\Api\Service\PaymentInstructionsProviderInterface` and add it
