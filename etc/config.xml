@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <pixelperfect_unpaid_order_reminder>
+            <general>
+                <enabled>0</enabled>
+                <sender>general</sender>
+                <bcc/>
+            </general>
+            <rules>
+                <methods>{}</methods>
+            </rules>
+        </pixelperfect_unpaid_order_reminder>
+    </default>
+</config>

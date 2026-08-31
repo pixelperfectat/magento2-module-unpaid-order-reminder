@@ -4,6 +4,10 @@
                 type="PixelPerfect\UnpaidOrderReminder\Model\Data\PaymentInstructions"/>
     <preference for="PixelPerfect\UnpaidOrderReminder\Api\Service\ProviderPoolInterface"
                 type="PixelPerfect\UnpaidOrderReminder\Service\Instructions\ProviderPool"/>
+    <preference for="PixelPerfect\UnpaidOrderReminder\Api\Service\ConfigInterface"
+                type="PixelPerfect\UnpaidOrderReminder\Service\Config"/>
+    <preference for="PixelPerfect\UnpaidOrderReminder\Api\Data\ReminderRuleInterface"
+                type="PixelPerfect\UnpaidOrderReminder\Model\Data\ReminderRule"/>
     <!-- The registry of describable methods. An integrator adds one with an <item>, or switches one
          off by setting its item to null. -->
     <type name="PixelPerfect\UnpaidOrderReminder\Service\Instructions\ProviderPool">

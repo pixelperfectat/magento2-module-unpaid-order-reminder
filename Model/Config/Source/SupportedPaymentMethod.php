@@ -26,6 +26,8 @@ class SupportedPaymentMethod implements OptionSourceInterface
     }
 
     /**
+     * Get the option array.
+     *
      * @return array<int, array<string, string>>
      */
     public function toOptionArray(): array

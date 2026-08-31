@@ -51,6 +51,8 @@ class Rules extends Value
     }
 
     /**
+     * Re-key the submitted rows by payment method and validate them before the value is persisted.
+     *
      * @return $this
      * @throws LocalizedException
      */

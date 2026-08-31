@@ -5,6 +5,7 @@ parameters:
     treatPhpDocTypesAsCertain: false
     paths:
         - Api
+        - Block
         - Console
         - Cron
         - Model
