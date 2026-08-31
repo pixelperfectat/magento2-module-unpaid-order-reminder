@@ -168,7 +168,16 @@ class ReminderRunner implements ReminderRunnerInterface
 
         if ($expiresAt !== null) {
             $expiresAtTimestamp = strtotime($expiresAt);
-            if ($expiresAtTimestamp !== false && $expiresAtTimestamp <= $this->dateTime->gmtTimestamp()) {
+            if ($expiresAtTimestamp === false) {
+                // Treated as "never expires" below; the warning is only so this is visible if a
+                // provider ever hands back something unparseable.
+                $this->logger->warning(sprintf(
+                    'UnpaidOrderReminder: could not parse expires_at "%s" for order %d; treating as'
+                    . ' not expired.',
+                    $expiresAt,
+                    $orderId
+                ));
+            } elseif ($expiresAtTimestamp <= $this->dateTime->gmtTimestamp()) {
                 // A shopper cannot act on a window that has already closed; telling them so is worse
                 // than silence.
                 return ['reason' => 'expired'] + $row;
@@ -228,7 +237,15 @@ class ReminderRunner implements ReminderRunnerInterface
     {
         try {
             $current = $this->orderRepository->get($orderId);
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            // Silence here would be dangerous: if the repository were ever broken, every order in
+            // the run would quietly fall back to stale data with no operator signal at all.
+            $this->logger->warning(sprintf(
+                'UnpaidOrderReminder: could not re-read order %d, falling back to the selected row: %s',
+                $orderId,
+                $e->getMessage()
+            ));
+
             return $order;
         }
 

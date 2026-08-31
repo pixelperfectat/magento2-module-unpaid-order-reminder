@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace PixelPerfect\UnpaidOrderReminder\Test\Unit\Service;
 
+use Magento\Framework\Exception\CouldNotSaveException;
 use Magento\Framework\Exception\MailException;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Sales\Api\Data\OrderInterface;
@@ -213,6 +214,56 @@ class ReminderRunnerTest extends TestCase
 
         $this->assertSame(1, $result->getSentCount());
         $this->assertSame(1, $result->getSkippedCount());
+        $this->assertSame(900, $result->getSkipped()[0]['order_id']);
+        $this->assertSame('send_failed', $result->getSkipped()[0]['reason']);
+        $this->assertSame(901, $result->getSent()[0]['order_id']);
+    }
+
+    /**
+     * Spec §13: the mail is already gone once the transport accepts it, so losing the log row must
+     * be loud (error-level) and must never turn a sent reminder into a skip - that would let the
+     * next run send a second one.
+     */
+    public function testLogsAnErrorAndStillCountsAsSentWhenTheLogRowFailsToSave(): void
+    {
+        $this->logRepository->method('save')->willThrowException(
+            new CouldNotSaveException(__('duplicate order_id'))
+        );
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with($this->stringContains('order 900'));
+        $logger->expects($this->never())->method('warning');
+
+        $result = $this->runner(null, $logger)->run();
+
+        $this->assertSame(1, $result->getSentCount());
+        $this->assertSame(0, $result->getSkippedCount());
+        $this->assertSame(900, $result->getSent()[0]['order_id']);
+    }
+
+    /**
+     * currentOrder()'s fallback must not be silent: an operator needs to know the re-read is not
+     * happening, or the freshness guard is disabled for the whole run with no signal at all.
+     */
+    public function testLogsAWarningAndFallsBackWhenTheOrderCannotBeReread(): void
+    {
+        $this->orderRepository->method('get')->willThrowException(
+            new \RuntimeException('database connection lost')
+        );
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('warning')->with(
+            $this->logicalAnd(
+                $this->stringContains('order 900'),
+                $this->stringContains('database connection lost')
+            )
+        );
+
+        $result = $this->runner(null, $logger)->run();
+
+        // The fallback still lets the run process the order on the data already in hand.
+        $this->assertSame(1, $result->getSentCount());
+        $this->assertSame(0, $result->getSkippedCount());
     }
 
     public function testFreezesTheOrderTotalAndExpiryOnTheLogRow(): void
@@ -230,9 +281,10 @@ class ReminderRunnerTest extends TestCase
 
     /**
      * @param ReminderLog|null $log
+     * @param LoggerInterface|null $logger
      * @return ReminderRunner
      */
-    private function runner(?ReminderLog $log = null): ReminderRunner
+    private function runner(?ReminderLog $log = null, ?LoggerInterface $logger = null): ReminderRunner
     {
         $criterion = $this->createMock(ReminderCriterionInterface::class);
 
@@ -262,7 +314,7 @@ class ReminderRunnerTest extends TestCase
             $resultFactory,
             $this->orderRepository,
             $dateTime,
-            $this->createMock(LoggerInterface::class)
+            $logger ?? $this->createMock(LoggerInterface::class)
         );
     }
 
