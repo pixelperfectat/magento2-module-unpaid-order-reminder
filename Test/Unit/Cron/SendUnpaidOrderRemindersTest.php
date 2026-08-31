@@ -47,7 +47,7 @@ class SendUnpaidOrderRemindersTest extends TestCase
         (new SendUnpaidOrderReminders($runner, $logger))->execute();
     }
 
-    public function result(int $sent, int $skipped): ReminderRunResultInterface
+    private function result(int $sent, int $skipped): ReminderRunResultInterface
     {
         $result = $this->createMock(ReminderRunResultInterface::class);
         $result->method('getSentCount')->willReturn($sent);

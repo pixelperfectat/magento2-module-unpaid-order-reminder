@@ -14,7 +14,7 @@ class SendRemindersCommandTest extends TestCase
 {
     public function testPrintsWhatWasSentAndSucceeds(): void
     {
-        $tester = $this->runHelper($this->result(
+        $tester = $this->executeCommand($this->result(
             [['order_id' => 900, 'increment_id' => '000000900', 'payment_method' => 'banktransfer', 'expires_at' => '2099-01-01 00:00:00', 'reason' => null]],
             []
         ));
@@ -40,7 +40,7 @@ class SendRemindersCommandTest extends TestCase
      */
     public function testExitsNonZeroWhenAnythingWasSkipped(): void
     {
-        $tester = $this->runHelper($this->result(
+        $tester = $this->executeCommand($this->result(
             [],
             [['order_id' => 901, 'increment_id' => '000000901', 'payment_method' => 'banktransfer', 'expires_at' => null, 'reason' => 'no_instructions']]
         ));
@@ -51,7 +51,7 @@ class SendRemindersCommandTest extends TestCase
 
     public function testReportsAnEmptyRunPlainly(): void
     {
-        $tester = $this->runHelper($this->result([], []));
+        $tester = $this->executeCommand($this->result([], []));
 
         $this->assertSame(Cli::RETURN_SUCCESS, $tester->getStatusCode());
         $this->assertStringContainsString('No order qualifies', $tester->getDisplay());
@@ -61,7 +61,7 @@ class SendRemindersCommandTest extends TestCase
      * @param ReminderRunResultInterface $result
      * @return CommandTester
      */
-    public function runHelper(ReminderRunResultInterface $result): CommandTester
+    private function executeCommand(ReminderRunResultInterface $result): CommandTester
     {
         $runner = $this->createMock(ReminderRunnerInterface::class);
         $runner->method('run')->willReturn($result);
@@ -77,7 +77,7 @@ class SendRemindersCommandTest extends TestCase
      * @param array<int, array<string, mixed>> $skipped
      * @return ReminderRunResultInterface
      */
-    public function result(array $sent, array $skipped): ReminderRunResultInterface
+    private function result(array $sent, array $skipped): ReminderRunResultInterface
     {
         $result = $this->createMock(ReminderRunResultInterface::class);
         $result->method('getSent')->willReturn($sent);
