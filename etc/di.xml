@@ -4,4 +4,16 @@
                 type="PixelPerfect\UnpaidOrderReminder\Model\Data\PaymentInstructions"/>
     <preference for="PixelPerfect\UnpaidOrderReminder\Api\Service\ProviderPoolInterface"
                 type="PixelPerfect\UnpaidOrderReminder\Service\Instructions\ProviderPool"/>
+    <!-- The registry of describable methods. An integrator adds one with an <item>, or switches one
+         off by setting its item to null. -->
+    <type name="PixelPerfect\UnpaidOrderReminder\Service\Instructions\ProviderPool">
+        <arguments>
+            <argument name="providers" xsi:type="array">
+                <item name="banktransfer" xsi:type="object">PixelPerfect\UnpaidOrderReminder\Service\Instructions\OfflineInstructions</item>
+                <item name="checkmo" xsi:type="object">PixelPerfect\UnpaidOrderReminder\Service\Instructions\OfflineInstructions</item>
+                <item name="cashondelivery" xsi:type="object">PixelPerfect\UnpaidOrderReminder\Service\Instructions\OfflineInstructions</item>
+                <item name="purchaseorder" xsi:type="object">PixelPerfect\UnpaidOrderReminder\Service\Instructions\OfflineInstructions</item>
+            </argument>
+        </arguments>
+    </type>
 </config>
