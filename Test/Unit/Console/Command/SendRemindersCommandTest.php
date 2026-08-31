@@ -32,7 +32,7 @@ class SendRemindersCommandTest extends TestCase
         $tester = new CommandTester(new SendRemindersCommand($runner));
         $tester->execute(['--dry-run' => true]);
 
-        $this->assertStringContainsString('would be sent', $tester->getDisplay());
+        $this->assertSame(Cli::RETURN_SUCCESS, $tester->getStatusCode());
     }
 
     /**

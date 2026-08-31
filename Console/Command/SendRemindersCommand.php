@@ -62,14 +62,10 @@ class SendRemindersCommand extends Command
         $dryRun = (bool)$input->getOption(self::OPTION_DRY_RUN);
         $result = $this->runner->run($dryRun);
 
-        if ($result->getSentCount() === 0 && $result->getSkippedCount() === 0 && !$dryRun) {
+        if ($result->getSentCount() === 0 && $result->getSkippedCount() === 0) {
             $output->writeln('No order qualifies for a reminder.');
 
             return Cli::RETURN_SUCCESS;
-        }
-
-        if ($result->getSentCount() === 0 && $result->getSkippedCount() === 0) {
-            $output->writeln('No order qualifies for a reminder.');
         }
 
         $this->renderRows($output, $result->getSent(), ['Order', 'Method', 'Expires']);
