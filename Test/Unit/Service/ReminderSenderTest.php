@@ -159,6 +159,30 @@ class ReminderSenderTest extends TestCase
         $this->sender->send($this->order(), $instructions, $this->rule('tpl'));
     }
 
+    /**
+     * The cast path a real offline order takes: an offline method's PaymentInstructions leaves
+     * every optional field null. Each flattened variable must arrive as an empty string, not
+     * null, so the template never has to distinguish "not set" from "not cast".
+     */
+    public function testFlattensNullInstructionsFieldsToEmptyStrings(): void
+    {
+        $instructions = $this->createMock(PaymentInstructionsInterface::class);
+
+        $this->transportBuilder->expects($this->once())
+            ->method('setTemplateVars')
+            ->with($this->callback(static function (array $vars): bool {
+                return $vars['instructionsHtml'] === ''
+                    && $vars['bankName'] === ''
+                    && $vars['bankAccount'] === ''
+                    && $vars['bankBic'] === ''
+                    && $vars['paymentReference'] === ''
+                    && $vars['paymentUrl'] === '';
+            }))
+            ->willReturnSelf();
+
+        $this->sender->send($this->order(), $instructions, $this->rule('tpl'));
+    }
+
     public function testAddsEveryConfiguredBccAddress(): void
     {
         $this->config = $this->createMock(ConfigInterface::class);

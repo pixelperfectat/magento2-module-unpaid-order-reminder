@@ -11,29 +11,51 @@ use PHPUnit\Framework\TestCase;
  * Magento\Framework\Filter\VariableResolver\StrictResolver gates template member access twice:
  * shouldHandleDataAccess() first allows only a DataObject, an AbstractTemplate, or an array as the
  * left-hand side, and only then does handleDataAccess() further require a method name starting
- * with "get". PaymentInstructions is a plain typed value object - it is not a DataObject, not an
- * AbstractTemplate, and not an array - so it fails the first gate regardless of method name: every
- * `instructions.getXxx()` call in the template silently resolves to null, not only a non-"get"
- * one. `order.*` is unaffected because Order extends AbstractModel, which is a DataObject.
+ * with "get". A plain typed value object - e.g. PaymentInstructions - is none of those, so it
+ * fails the first gate regardless of method name: every dotted call on it silently resolves to
+ * null. The fix is to precompute such fields in PHP and pass them as scalar template variables,
+ * never the object itself.
  *
- * The fix is to precompute every instructions field in PHP and pass it as its own scalar template
- * variable, never the instructions object itself. These two checks guard against reintroducing
- * either layer of the bug, in this template or a later one.
+ * The two checks below are complementary and each guards one gate: which variables may be
+ * dotted at all, and which methods may be called once a variable clears that gate.
  */
 class UnpaidOrderReminderTemplateTest extends TestCase
 {
-    public function testTemplateNeverAccessesTheInstructionsObjectDirectly(): void
+    /**
+     * Variables known to satisfy StrictResolver::shouldHandleDataAccess() - i.e. known to be a
+     * DataObject, an AbstractTemplate, or an array - and therefore the only variables this
+     * template may access with dotted (property or method) syntax. `order` is a
+     * Magento\Sales\Api\Data\OrderInterface implementation, which extends AbstractModel, which
+     * extends DataObject. `store` is the store view object the email header/footer templates
+     * resolve through, also a DataObject.
+     *
+     * Anything else - any other value object a future field might introduce - fails that gate
+     * regardless of method name and must be flattened into a scalar template variable by the
+     * sender first. This allowlist encodes the rule so the guard survives a future variable
+     * with a different name than "instructions".
+     *
+     * @var array<int, string>
+     */
+    private const VARIABLES_SATISFYING_THE_DATA_OBJECT_GATE = ['order', 'store'];
+
+    public function testTemplateOnlyDotsVariablesKnownToSatisfyTheDataObjectGate(): void
     {
-        $this->assertFileExists($this->templatePath());
         $contents = (string)file_get_contents($this->templatePath());
 
-        $this->assertStringNotContainsString(
-            'instructions.',
-            $contents,
-            'The instructions object fails StrictResolver::shouldHandleDataAccess() (it is not a '
-            . 'DataObject, an AbstractTemplate, or an array), so any instructions.* access would '
-            . 'silently resolve to null. Every instructions field must be passed as its own '
-            . 'precomputed scalar template variable instead.'
+        preg_match_all('/\$?\b([A-Za-z_][A-Za-z0-9_]*)\.[A-Za-z_][A-Za-z0-9_]*/', $contents, $matches);
+        $dottedVariables = array_values(array_unique($matches[1]));
+
+        $this->assertNotEmpty($dottedVariables, 'Expected the template to dot-access at least one variable.');
+
+        $offenders = array_values(array_diff($dottedVariables, self::VARIABLES_SATISFYING_THE_DATA_OBJECT_GATE));
+
+        $this->assertSame(
+            [],
+            $offenders,
+            'A variable may only be dot-accessed in this template when it is a DataObject, an '
+            . 'AbstractTemplate, or an array (StrictResolver::shouldHandleDataAccess()) - '
+            . 'otherwise every dotted access on it silently resolves to null. Found a dotted '
+            . 'variable outside the known-safe allowlist: ' . implode(', ', $offenders)
         );
     }
 
@@ -41,9 +63,9 @@ class UnpaidOrderReminderTemplateTest extends TestCase
     {
         $contents = (string)file_get_contents($this->templatePath());
 
-        // order.* is exempt: Order extends AbstractModel, which satisfies the DataObject gate,
-        // so its getters DO resolve - this check is only about the get-prefix requirement that
-        // applies once that first gate is passed.
+        // order.* (and store.*) are exempt from nothing here: this check is only about the
+        // get-prefix requirement that applies once a variable has already cleared the DataObject
+        // gate asserted above.
         preg_match_all('/\b[A-Za-z_][A-Za-z0-9_]*\.([A-Za-z_][A-Za-z0-9_]*)\(\)/', $contents, $matches);
         $methodNames = $matches[1];
 
