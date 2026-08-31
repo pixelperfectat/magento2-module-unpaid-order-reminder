@@ -2,4 +2,6 @@
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
     <preference for="PixelPerfect\UnpaidOrderReminder\Api\Data\PaymentInstructionsInterface"
                 type="PixelPerfect\UnpaidOrderReminder\Model\Data\PaymentInstructions"/>
+    <preference for="PixelPerfect\UnpaidOrderReminder\Api\Service\ProviderPoolInterface"
+                type="PixelPerfect\UnpaidOrderReminder\Service\Instructions\ProviderPool"/>
 </config>
