@@ -20,6 +20,10 @@
                 type="PixelPerfect\UnpaidOrderReminder\Model\Data\ReminderRunResult"/>
     <preference for="PixelPerfect\UnpaidOrderReminder\Api\Service\ReminderRunnerInterface"
                 type="PixelPerfect\UnpaidOrderReminder\Service\ReminderRunner"/>
+    <preference for="PixelPerfect\UnpaidOrderReminder\Api\Data\ReminderEfficacyInterface"
+                type="PixelPerfect\UnpaidOrderReminder\Model\Data\ReminderEfficacy"/>
+    <preference for="PixelPerfect\UnpaidOrderReminder\Api\Service\ReminderEfficacyReaderInterface"
+                type="PixelPerfect\UnpaidOrderReminder\Service\ReminderEfficacyReader"/>
     <!-- The registry of describable methods. An integrator adds one with an <item>, or switches one
          off by setting its item to null. -->
     <type name="PixelPerfect\UnpaidOrderReminder\Service\Instructions\ProviderPool">
@@ -48,6 +52,7 @@
         <arguments>
             <argument name="commands" xsi:type="array">
                 <item name="pixelperfect_unpaidorder_send_reminders" xsi:type="object">PixelPerfect\UnpaidOrderReminder\Console\Command\SendRemindersCommand</item>
+                <item name="pixelperfect_unpaidorder_reminder_stats" xsi:type="object">PixelPerfect\UnpaidOrderReminder\Console\Command\ReminderStatsCommand</item>
             </argument>
         </arguments>
     </type>
