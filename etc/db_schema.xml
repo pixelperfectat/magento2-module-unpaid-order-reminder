@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+    <table name="pixelperfect_unpaid_order_reminder" resource="default" engine="innodb"
+           comment="One row per order that has been sent an unpaid-order reminder">
+        <column xsi:type="int" name="entity_id" unsigned="true" nullable="false" identity="true" comment="Entity ID"/>
+        <column xsi:type="int" name="order_id" unsigned="true" nullable="false" comment="Sales order entity ID"/>
+        <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false" default="0" comment="Store ID"/>
+        <column xsi:type="varchar" name="payment_method" length="64" nullable="false" comment="Payment method code the rule matched"/>
+        <column xsi:type="datetime" name="sent_at" nullable="false" comment="When the reminder was sent, UTC"/>
+        <column xsi:type="datetime" name="expires_at" nullable="true" comment="When the payment window closes, UTC; null if it never closes"/>
+        <column xsi:type="decimal" name="grand_total" scale="4" precision="20" nullable="false" default="0"
+                comment="Order total frozen at send time, so efficacy survives a later order edit"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+        <!-- One reminder per order, enforced by the database. The selection criterion also checks
+             this, but only the constraint survives two cron runs overlapping. -->
+        <constraint xsi:type="unique" referenceId="PIXELPERFECT_UNPAID_ORDER_REMINDER_ORDER_ID">
+            <column name="order_id"/>
+        </constraint>
+        <index referenceId="PIXELPERFECT_UNPAID_ORDER_REMINDER_SENT_AT" indexType="btree">
+            <column name="sent_at"/>
+        </index>
+    </table>
+</schema>

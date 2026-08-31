@@ -1,0 +1,20 @@
+{
+    "pixelperfect_unpaid_order_reminder": {
+        "column": {
+            "entity_id": true,
+            "order_id": true,
+            "store_id": true,
+            "payment_method": true,
+            "sent_at": true,
+            "expires_at": true,
+            "grand_total": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "PIXELPERFECT_UNPAID_ORDER_REMINDER_ORDER_ID": true
+        },
+        "index": {
+            "PIXELPERFECT_UNPAID_ORDER_REMINDER_SENT_AT": true
+        }
+    }
+}
