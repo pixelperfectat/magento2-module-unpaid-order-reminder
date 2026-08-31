@@ -134,6 +134,13 @@ class ReminderRunner implements ReminderRunnerInterface
             return ['reason' => 'no_longer_pending'] + $row;
         }
 
+        // Stamped the moment this cycle confirmed the order was still unpaid, not after the send:
+        // a provider's instructions lookup can be a live call to the payment gateway itself (the
+        // Mollie companion package does exactly that), so the gap between this check and the send
+        // is not free. Every early return below this point still returns before any row is written,
+        // so an unused timestamp costs nothing.
+        $sentAt = (string)$this->dateTime->gmtDate(self::MYSQL_DATETIME);
+
         $provider = $this->providerPool->getProvider($method);
         if ($provider === null) {
             return ['reason' => 'no_provider'] + $row;
@@ -187,11 +194,6 @@ class ReminderRunner implements ReminderRunnerInterface
         if ($dryRun) {
             return $row;
         }
-
-        // Stamped before the send, not after: this is the moment the reminder cycle for this order
-        // began, and it guarantees any state change the send itself could race with (a payment
-        // webhook landing while the mail is in flight) has an updated_at no earlier than this value.
-        $sentAt = (string)$this->dateTime->gmtDate(self::MYSQL_DATETIME);
 
         try {
             $this->sender->send($current, $instructions, $rules[$method]);

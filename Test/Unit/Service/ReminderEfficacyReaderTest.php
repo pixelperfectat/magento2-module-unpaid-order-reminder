@@ -120,13 +120,19 @@ class ReminderEfficacyReaderTest extends TestCase
         $insertPp = $pdo->prepare('INSERT INTO pp (order_id, sent_at, expires_at) VALUES (?, ?, ?)');
         $insertSo = $pdo->prepare('INSERT INTO so (entity_id, state, updated_at) VALUES (?, ?, ?)');
 
-        // 1: paid at the exact same second the reminder was stamped - the boundary this fix closes.
-        // 2: still pending, no expiry.       3: pending, past its expiry.      4: cancelled.
+        // 1: paid at the exact same second the reminder was stamped - the boundary the first fix
+        //    closed.       2: still pending, no expiry.       3: pending, past its expiry.
+        // 4: cancelled.
+        // 5: paid a second after sent_at was stamped, i.e. landing in the window between the
+        //    pending-state check and the send (the instructions lookup and expiry check run in
+        //    between). Since sent_at is now captured before that window rather than after it, this
+        //    row's updated_at falls after sent_at and lands in paid, not nowhere - the fix in round 2.
         $fixture = [
             [1, '2026-08-01 10:00:00', null, 'processing', '2026-08-01 10:00:00'],
             [2, '2026-08-01 10:00:00', null, 'pending_payment', '2026-08-01 10:00:00'],
             [3, '2026-08-01 10:00:00', '2026-08-05 00:00:00', 'pending_payment', '2026-08-01 10:00:00'],
             [4, '2026-08-01 10:00:00', null, 'canceled', '2026-08-01 10:00:00'],
+            [5, '2026-08-01 10:00:00', null, 'processing', '2026-08-01 10:00:01'],
         ];
         foreach ($fixture as [$orderId, $sentAt, $expiresAt, $state, $updatedAt]) {
             $insertPp->execute([$orderId, $sentAt, $expiresAt]);
@@ -143,8 +149,12 @@ class ReminderEfficacyReaderTest extends TestCase
         );
         $result = $pdo->query($sql)->fetch(PDO::FETCH_ASSOC);
 
-        $this->assertSame(4, (int)$result['reminded_count']);
-        $this->assertSame(1, (int)$result['paid_count'], 'the same-second payment must count as paid');
+        $this->assertSame(5, (int)$result['reminded_count']);
+        $this->assertSame(
+            2,
+            (int)$result['paid_count'],
+            'the same-second payment and the one landing a second later must both count as paid'
+        );
         $this->assertSame(1, (int)$result['still_unpaid_count']);
         $this->assertSame(2, (int)$result['expired_count']);
         $this->assertSame(

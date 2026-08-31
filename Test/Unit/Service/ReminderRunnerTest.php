@@ -267,12 +267,15 @@ class ReminderRunnerTest extends TestCase
     }
 
     /**
-     * sent_at must be captured before the send, not after: a payment webhook racing the mail-send
-     * must never be able to land with an updated_at earlier than sent_at. See
+     * sent_at must be captured the moment this cycle confirms the order is still unpaid - before the
+     * instructions lookup and before the send, not after either of them. A provider's lookup can be
+     * a live call to the payment gateway itself (the Mollie companion package does exactly that), so
+     * that window is not free; a payment webhook racing it must never be able to land with an
+     * updated_at earlier than sent_at. See
      * ReminderEfficacyReaderTest::testTheThreeGroupsSumToTheRemindedCountIncludingAnEqualTimestamp()
      * for why that ordering is what makes the efficacy partition exhaustive.
      */
-    public function testStampsSentAtBeforeSendingRatherThanAfter(): void
+    public function testStampsSentAtBeforeTheInstructionsLookupAndTheSend(): void
     {
         $order = [];
         $dateTime = $this->createMock(DateTime::class);
@@ -282,13 +285,23 @@ class ReminderRunnerTest extends TestCase
         });
         $dateTime->method('gmtTimestamp')->willReturn(1788170400);
 
+        $this->provider = $this->createMock(PaymentInstructionsProviderInterface::class);
+        $this->provider->method('forOrder')->willReturnCallback(
+            function () use (&$order): PaymentInstructionsInterface {
+                $order[] = 'forOrder';
+                return $this->instructions('2099-01-01 00:00:00');
+            }
+        );
+        $this->pool = $this->createMock(ProviderPoolInterface::class);
+        $this->pool->method('getProvider')->willReturn($this->provider);
+
         $this->sender->method('send')->willReturnCallback(static function () use (&$order): void {
             $order[] = 'sent';
         });
 
         $this->runner(null, null, $dateTime)->run();
 
-        $this->assertSame(['stamped', 'sent'], $order);
+        $this->assertSame(['stamped', 'forOrder', 'sent'], $order);
     }
 
     public function testFreezesTheOrderTotalAndExpiryOnTheLogRow(): void
