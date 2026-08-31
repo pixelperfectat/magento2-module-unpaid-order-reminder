@@ -1,0 +1,62 @@
+# Unpaid Order Reminder for Magento 2
+
+Sends one reminder for an order that is still awaiting payment, carrying the instructions the shopper
+needs to complete it, while the payment window is still open. Records that the reminder was sent, and
+reports how many reminded orders were then paid.
+
+Magento cancels an unpaid order when it expires. Nothing in Magento asks the shopper to pay first.
+
+## What it covers
+
+Out of the box this package handles Magento's offline payment methods — bank transfer, check or money
+order, cash on delivery and purchase order — whose instructions live in store configuration.
+
+Payment providers that host their own transfer instructions need a companion package, because those
+instructions are per-payment and must be fetched from the provider:
+
+| Provider | Package |
+|---|---|
+| Mollie bank transfer | `pixelperfectat/magento2-module-unpaid-order-reminder-mollie` |
+
+## Install
+
+```bash
+composer require pixelperfectat/magento2-module-unpaid-order-reminder
+bin/magento module:enable PixelPerfect_UnpaidOrderReminder
+bin/magento setup:upgrade
+```
+
+The module ships **disabled**. Nothing is sent until you enable it.
+
+## Configure
+
+`Stores → Configuration → Sales → Unpaid Order Reminder`
+
+| Setting | Meaning |
+|---|---|
+| Enabled | Master switch. Default: No. |
+| Sender | The store email identity the reminder is sent from. |
+| Send copy to | Optional BCC address. |
+| Reminder rules | One row per payment method: the delay in days, and the email template. |
+
+The payment-method dropdown lists only methods that have a registered instructions provider, so a rule
+can never point at a method this module cannot describe.
+
+## Commands
+
+```bash
+bin/magento pixelperfect:unpaidorder:send-reminders --dry-run   # list, send nothing
+bin/magento pixelperfect:unpaidorder:send-reminders
+bin/magento pixelperfect:unpaidorder:reminder-stats
+```
+
+A cron job runs the same code daily.
+
+## Adding a payment method
+
+Implement `PixelPerfect\UnpaidOrderReminder\Api\Service\PaymentInstructionsProviderInterface` and add it
+to the provider pool in your own `di.xml`. See the Mollie package for a worked example.
+
+## Licence
+
+MIT.
