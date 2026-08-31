@@ -193,6 +193,38 @@ class ReminderSenderTest extends TestCase
         $this->sender->send($this->order(), $instructions, $this->rule('tpl'));
     }
 
+    /**
+     * The template cannot call hasStructuredBankDetails() directly: Magento's StrictResolver only
+     * resolves template method calls whose name starts with "get", so any other method call
+     * silently resolves to null and a {{depend}} guarded by it is always false. The flag must
+     * therefore be precomputed here and passed as a plain template variable.
+     */
+    public function testPassesWhetherStructuredBankDetailsAreAvailable(): void
+    {
+        $instructions = $this->createMock(PaymentInstructionsInterface::class);
+        $instructions->method('hasStructuredBankDetails')->willReturn(true);
+
+        $this->transportBuilder->expects($this->once())
+            ->method('setTemplateVars')
+            ->with($this->callback(static fn (array $vars): bool => $vars['hasBankDetails'] === true))
+            ->willReturnSelf();
+
+        $this->sender->send($this->order(), $instructions, $this->rule('tpl'));
+    }
+
+    public function testPassesFalseWhenStructuredBankDetailsAreNotAvailable(): void
+    {
+        $instructions = $this->createMock(PaymentInstructionsInterface::class);
+        $instructions->method('hasStructuredBankDetails')->willReturn(false);
+
+        $this->transportBuilder->expects($this->once())
+            ->method('setTemplateVars')
+            ->with($this->callback(static fn (array $vars): bool => $vars['hasBankDetails'] === false))
+            ->willReturnSelf();
+
+        $this->sender->send($this->order(), $instructions, $this->rule('tpl'));
+    }
+
     private function order(): OrderInterface
     {
         $order = $this->createMock(OrderInterface::class);

@@ -78,6 +78,10 @@ class ReminderSender implements ReminderSenderInterface
                     'order' => $order,
                     'instructions' => $instructions,
                     'store_id' => $storeId,
+                    // Magento's StrictResolver only resolves template method calls whose name
+                    // starts with "get", so hasStructuredBankDetails() can never be called
+                    // directly from the template; it must be precomputed here.
+                    'hasBankDetails' => $instructions->hasStructuredBankDetails(),
                     'formattedTotal' => $this->priceCurrency->format(
                         (float)$order->getGrandTotal(),
                         false,

@@ -2,7 +2,7 @@
 <!--@vars {
 "var order.increment_id":"Order Number",
 "var order.customer_firstname":"Customer First Name",
-"var instructions.hasStructuredBankDetails()":"Whether structured bank details are available",
+"var hasBankDetails":"Whether structured bank details are available",
 "var instructions.getBankName()":"Bank name",
 "var instructions.getBankAccount()":"Account number",
 "var instructions.getBankBic()":"BIC",
@@ -22,7 +22,7 @@
     {{trans 'Your order %increment_id is still waiting for payment.' increment_id=$order.increment_id}}
 </p>
 
-{{depend instructions.hasStructuredBankDetails()}}
+{{depend hasBankDetails}}
 <table class="message-details">
     <tr><th>{{trans "Bank"}}</th><td>{{var instructions.getBankName()}}</td></tr>
     <tr><th>{{trans "Account"}}</th><td>{{var instructions.getBankAccount()}}</td></tr>
