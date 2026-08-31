@@ -12,6 +12,8 @@
                 type="PixelPerfect\UnpaidOrderReminder\Model\ReminderLog"/>
     <preference for="PixelPerfect\UnpaidOrderReminder\Api\ReminderLogRepositoryInterface"
                 type="PixelPerfect\UnpaidOrderReminder\Model\ReminderLogRepository"/>
+    <preference for="PixelPerfect\UnpaidOrderReminder\Api\Service\ReminderCriterionInterface"
+                type="PixelPerfect\UnpaidOrderReminder\Service\Criterion\CompositeReminderCriterion"/>
     <!-- The registry of describable methods. An integrator adds one with an <item>, or switches one
          off by setting its item to null. -->
     <type name="PixelPerfect\UnpaidOrderReminder\Service\Instructions\ProviderPool">
@@ -21,6 +23,18 @@
                 <item name="checkmo" xsi:type="object">PixelPerfect\UnpaidOrderReminder\Service\Instructions\OfflineInstructions</item>
                 <item name="cashondelivery" xsi:type="object">PixelPerfect\UnpaidOrderReminder\Service\Instructions\OfflineInstructions</item>
                 <item name="purchaseorder" xsi:type="object">PixelPerfect\UnpaidOrderReminder\Service\Instructions\OfflineInstructions</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <!-- This is "eligible for a reminder": add or remove a rule with a single <item>, or switch one
+         off by setting it to null. No PHP change required. -->
+    <type name="PixelPerfect\UnpaidOrderReminder\Service\Criterion\CompositeReminderCriterion">
+        <arguments>
+            <argument name="criteria" xsi:type="array">
+                <item name="is_pending_payment" xsi:type="object">PixelPerfect\UnpaidOrderReminder\Service\Criterion\IsPendingPayment</item>
+                <item name="matches_an_enabled_rule" xsi:type="object">PixelPerfect\UnpaidOrderReminder\Service\Criterion\MatchesAnEnabledRule</item>
+                <item name="not_yet_reminded" xsi:type="object">PixelPerfect\UnpaidOrderReminder\Service\Criterion\NotYetReminded</item>
             </argument>
         </arguments>
     </type>
