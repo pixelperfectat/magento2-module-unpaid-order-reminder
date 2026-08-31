@@ -24,15 +24,20 @@ class SendRemindersCommandTest extends TestCase
         $this->assertStringContainsString('1 reminder(s) sent, 0 skipped.', $tester->getDisplay());
     }
 
-    public function testPassesTheDryRunOptionThrough(): void
+public function testPassesTheDryRunOptionThroughAndSayWouldBeSent(): void
     {
         $runner = $this->createMock(ReminderRunnerInterface::class);
-        $runner->expects($this->once())->method('run')->with(true)->willReturn($this->result([], []));
+        $runner->expects($this->once())->method('run')->with(true)->willReturn($this->result(
+            [['order_id' => 900, 'increment_id' => '000000900', 'payment_method' => 'banktransfer', 'expires_at' => '2099-01-01 00:00:00', 'reason' => null]],
+            []
+        ));
 
         $tester = new CommandTester(new SendRemindersCommand($runner));
         $tester->execute(['--dry-run' => true]);
 
         $this->assertSame(Cli::RETURN_SUCCESS, $tester->getStatusCode());
+        $this->assertStringContainsString('would be sent', $tester->getDisplay());
+        $this->assertStringNotContainsString('reminder(s) sent,', $tester->getDisplay());
     }
 
     /**
