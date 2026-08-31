@@ -14,6 +14,8 @@
                 type="PixelPerfect\UnpaidOrderReminder\Model\ReminderLogRepository"/>
     <preference for="PixelPerfect\UnpaidOrderReminder\Api\Service\ReminderCriterionInterface"
                 type="PixelPerfect\UnpaidOrderReminder\Service\Criterion\CompositeReminderCriterion"/>
+    <preference for="PixelPerfect\UnpaidOrderReminder\Api\Service\ReminderSenderInterface"
+                type="PixelPerfect\UnpaidOrderReminder\Service\ReminderSender"/>
     <!-- The registry of describable methods. An integrator adds one with an <item>, or switches one
          off by setting its item to null. -->
     <type name="PixelPerfect\UnpaidOrderReminder\Service\Instructions\ProviderPool">
