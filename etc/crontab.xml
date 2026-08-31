@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Cron:etc/crontab.xsd">
+    <group id="default">
+        <!-- Daily. The delay is measured in days, so anything more frequent only re-runs the same
+             query against the same result set. -->
+        <job name="pixelperfect_unpaid_order_reminder_send" instance="PixelPerfect\UnpaidOrderReminder\Cron\SendUnpaidOrderReminders" method="execute">
+            <schedule>0 9 * * *</schedule>
+        </job>
+    </group>
+</config>

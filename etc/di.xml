@@ -44,4 +44,11 @@
             </argument>
         </arguments>
     </type>
+    <type name="Magento\Framework\Console\CommandList">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="pixelperfect_unpaidorder_send_reminders" xsi:type="object">PixelPerfect\UnpaidOrderReminder\Console\Command\SendRemindersCommand</item>
+            </argument>
+        </arguments>
+    </type>
 </config>
