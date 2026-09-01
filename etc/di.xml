@@ -44,6 +44,7 @@
             <argument name="criteria" xsi:type="array">
                 <item name="is_pending_payment" xsi:type="object">PixelPerfect\UnpaidOrderReminder\Service\Criterion\IsPendingPayment</item>
                 <item name="matches_an_enabled_rule" xsi:type="object">PixelPerfect\UnpaidOrderReminder\Service\Criterion\MatchesAnEnabledRule</item>
+                <item name="within_max_age" xsi:type="object">PixelPerfect\UnpaidOrderReminder\Service\Criterion\WithinMaxAge</item>
                 <item name="not_yet_reminded" xsi:type="object">PixelPerfect\UnpaidOrderReminder\Service\Criterion\NotYetReminded</item>
             </argument>
         </arguments>

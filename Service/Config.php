@@ -20,6 +20,7 @@ class Config implements ConfigInterface
     private const PATH_SENDER = 'pixelperfect_unpaid_order_reminder/general/sender';
     private const PATH_BCC = 'pixelperfect_unpaid_order_reminder/general/bcc';
     private const PATH_RULES = 'pixelperfect_unpaid_order_reminder/rules/methods';
+    private const PATH_MAX_AGE_DAYS = 'pixelperfect_unpaid_order_reminder/general/max_age_days';
 
     /**
      * @param ScopeConfigInterface $scopeConfig
@@ -86,6 +87,21 @@ class Config implements ConfigInterface
         }
 
         return $rules;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getMaxAgeDays(?int $storeId = null): int
+    {
+        $value = $this->scopeConfig->getValue(self::PATH_MAX_AGE_DAYS, ScopeInterface::SCOPE_STORE, $storeId);
+        if (!is_numeric($value)) {
+            return 0;
+        }
+
+        // A negative bound would exclude every order. Read as "no bound", which is what an operator
+        // who typed one is far more likely to have meant than "send nothing, silently".
+        return max(0, (int)$value);
     }
 
     /**

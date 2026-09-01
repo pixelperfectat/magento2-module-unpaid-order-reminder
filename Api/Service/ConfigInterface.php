@@ -32,6 +32,16 @@ interface ConfigInterface
      * @param int|null $storeId
      * @return string the store email identity to send from
      */
+    /**
+     * The maximum age, in days, an order may have and still be reminded.
+     *
+     * Zero means no upper bound.
+     *
+     * @param int|null $storeId
+     * @return int
+     */
+    public function getMaxAgeDays(?int $storeId = null): int;
+
     public function getSender(?int $storeId = null): string;
 
     /**

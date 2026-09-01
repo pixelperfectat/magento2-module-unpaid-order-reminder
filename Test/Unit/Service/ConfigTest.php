@@ -42,6 +42,33 @@ class ConfigTest extends TestCase
         $this->config = new Config($this->scopeConfig, $this->pool, $serializer, $ruleFactory);
     }
 
+    /**
+     * @dataProvider maxAgeProvider
+     */
+    public function testReadsTheMaximumAge(mixed $stored, int $expected): void
+    {
+        $this->scopeConfig->method('getValue')->willReturn($stored);
+
+        $this->assertSame($expected, $this->config->getMaxAgeDays(1));
+    }
+
+    /**
+     * @return array<string, array{0: mixed, 1: int}>
+     */
+    public static function maxAgeProvider(): array
+    {
+        return [
+            'the shipped default' => ['30', 30],
+            'zero means no limit' => ['0', 0],
+            // A negative bound would match no order at all. Read as "no limit", because an operator
+            // who typed one did not mean "silently stop sending".
+            'a negative is read as no limit' => ['-5', 0],
+            'a blank field is no limit' => ['', 0],
+            'text is no limit' => ['soon', 0],
+            'null is no limit' => [null, 0],
+        ];
+    }
+
     public function testIsDisabledByDefault(): void
     {
         $this->scopeConfig->method('isSetFlag')->willReturn(false);

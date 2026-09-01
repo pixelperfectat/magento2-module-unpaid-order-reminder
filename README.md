@@ -37,10 +37,17 @@ The module ships **disabled**. Nothing is sent until you enable it.
 | Enabled | Master switch. Default: No. |
 | Sender | The store email identity the reminder is sent from. |
 | Send copy to | Optional BCC address. |
+| Do not remind orders older than (days) | Upper age bound. Default: 30. Use 0 for no limit. |
 | Reminder rules | One row per payment method: the delay in days, and the email template. |
 
 The payment-method dropdown lists only methods that have a registered instructions provider, so a rule
 can never point at a method this module cannot describe.
+
+**Set the age bound before you switch the module on.** Without it, the first run selects every unpaid
+order the shop has ever taken, and mails people about orders they placed months ago. An order that has
+a payment deadline is already protected, because a reminder is never sent once that window has closed.
+A method with no deadline at all - an offline bank transfer, for instance - has nothing to protect it
+but this bound.
 
 ## Commands
 
