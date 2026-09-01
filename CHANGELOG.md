@@ -5,6 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-09-01
+
+### Added
+
+- A **maximum age** bound, in `Stores → Configuration → Sales → Unpaid Order Reminder`. Default 30 days;
+  0 means no limit. Without it, the first run after switch-on selects every unpaid order the shop has
+  ever taken and mails all of them at once. Measured on a production database: 29 unpaid card and wallet
+  orders, all over 30 days old, none of them payable. An order that carries a payment deadline was
+  already safe, because a closed window is never mailed; a method with no deadline — an offline bank
+  transfer never expires — had nothing protecting it.
+
+### Fixed
+
+- The payment deadline was read in PHP's default timezone rather than UTC. The value object contract is
+  `Y-m-d H:i:s` with no offset, and `strtotime()` resolves that against whatever timezone PHP is set to.
+  On a shop running local time, an order was therefore called expired hours before its window closed, or
+  reminded after it had already passed.
+
+### Upgrade note
+
+The bound applies as soon as this version is installed, at its 30-day default. Set it to `0` first if
+you rely on reminding older orders.
+
 ## [0.2.2] - 2026-09-01
 
 ### Fixed
