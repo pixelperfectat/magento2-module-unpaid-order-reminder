@@ -5,6 +5,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-09-01
+
+### Fixed
+
+- The module selected no order for any of the offline payment methods it ships providers for. Everything
+  that inspected order state assumed `pending_payment`, but Magento's offline methods set
+  `order_status = pending`, which resolves to state `new`. On its own the module therefore reminded
+  nobody; it worked only alongside a provider whose gateway uses `pending_payment`.
+- The reported figures overstated conversion. The efficacy reader treated any state other than
+  `pending_payment` or `canceled` as paid, so a reminded offline order that had **not** been paid was
+  counted as paid. This was silent — the number simply read better than reality.
+- The pre-send re-read rejected offline orders as "no longer pending" for the same reason.
+
+### Changed
+
+- The states treated as "awaiting payment" are now a list, `IsPendingPayment::PENDING_STATES`, holding
+  `pending_payment` and `new`. It is wired from `etc/di.xml` into the selection criterion, the runner's
+  re-read guard and the efficacy reader, so the three cannot drift apart. Override that one argument to
+  suit a gateway that parks unpaid orders elsewhere.
+- `IsPendingPayment`'s constructor takes `array $states` in place of `string $state`. The class name is
+  unchanged, so any `di.xml` reference still resolves.
+
 ## [0.1.0] - 2026-09-01
 
 ### Added
