@@ -142,6 +142,43 @@ class ReminderRunnerTest extends TestCase
      * A shopper cannot act on a window that has already closed, and telling them so is worse than
      * silence.
      */
+    /**
+     * The deadline is a UTC 'Y-m-d H:i:s' string with no offset in it, so whatever parses it decides
+     * which timezone it means. strtotime() would read it in PHP's default timezone: on a shop whose
+     * PHP is set to local time, the comparison against gmtTimestamp() is then wrong by that offset,
+     * and an order is called expired hours before its window actually closes.
+     *
+     * The deadline here is one hour in the future in UTC. Read in a +14 zone it lands thirteen hours
+     * in the past, so a timezone-blind parse skips the order and no mail goes out.
+     */
+    public function testReadsTheDeadlineAsUtcWhateverPhpsDefaultTimezoneIs(): void
+    {
+        $originalTimezone = date_default_timezone_get();
+        date_default_timezone_set('Pacific/Kiritimati');
+
+        try {
+            $now = 1788170400;
+            $dateTime = $this->createMock(DateTime::class);
+            $dateTime->method('gmtDate')->willReturn('2026-08-31 10:00:00');
+            $dateTime->method('gmtTimestamp')->willReturn($now);
+
+            $this->provider = $this->createMock(PaymentInstructionsProviderInterface::class);
+            $this->provider->method('forOrder')
+                ->willReturn($this->instructions(gmdate('Y-m-d H:i:s', $now + 3600)));
+            $this->pool = $this->createMock(ProviderPoolInterface::class);
+            $this->pool->method('getProvider')->willReturn($this->provider);
+
+            $this->sender->expects($this->once())->method('send');
+
+            $result = $this->runner(null, null, $dateTime)->run();
+
+            $this->assertSame(1, $result->getSentCount());
+            $this->assertSame(0, $result->getSkippedCount());
+        } finally {
+            date_default_timezone_set($originalTimezone);
+        }
+    }
+
     public function testSkipsAnOrderWhosePaymentWindowHasClosed(): void
     {
         $this->provider = $this->createMock(PaymentInstructionsProviderInterface::class);

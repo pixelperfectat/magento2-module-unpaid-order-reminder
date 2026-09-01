@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace PixelPerfect\UnpaidOrderReminder\Service;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
@@ -179,8 +181,8 @@ class ReminderRunner implements ReminderRunnerInterface
         $row['expires_at'] = $expiresAt;
 
         if ($expiresAt !== null) {
-            $expiresAtTimestamp = strtotime($expiresAt);
-            if ($expiresAtTimestamp === false) {
+            $expiresAtTimestamp = $this->expiresAtTimestamp($expiresAt);
+            if ($expiresAtTimestamp === null) {
                 // Treated as "never expires" below; the warning is only so this is visible if a
                 // provider ever hands back something unparseable.
                 $this->logger->warning(sprintf(
@@ -233,6 +235,26 @@ class ReminderRunner implements ReminderRunnerInterface
         }
 
         return $row;
+    }
+
+    /**
+     * Parse a provider's deadline into a UTC timestamp, or null when it cannot be parsed.
+     *
+     * The value object contract is UTC 'Y-m-d H:i:s', which carries no offset. strtotime() would
+     * read it in PHP's default timezone instead, so on a shop whose PHP is set to local time the
+     * comparison against gmtTimestamp() was wrong by that offset - an order counted as expired
+     * hours early, or reminded hours after its window closed.
+     *
+     * @param string $expiresAt
+     * @return int|null
+     */
+    private function expiresAtTimestamp(string $expiresAt): ?int
+    {
+        try {
+            return (new DateTimeImmutable($expiresAt, new DateTimeZone('UTC')))->getTimestamp();
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /**
