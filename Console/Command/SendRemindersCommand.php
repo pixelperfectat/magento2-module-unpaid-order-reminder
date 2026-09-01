@@ -3,7 +3,10 @@ declare(strict_types=1);
 
 namespace PixelPerfect\UnpaidOrderReminder\Console\Command;
 
+use Magento\Framework\App\Area;
+use Magento\Framework\App\State;
 use Magento\Framework\Console\Cli;
+use Magento\Framework\Exception\LocalizedException;
 use PixelPerfect\UnpaidOrderReminder\Api\Data\ReminderRunResultInterface;
 use PixelPerfect\UnpaidOrderReminder\Api\Service\ReminderRunnerInterface;
 use Symfony\Component\Console\Command\Command;
@@ -22,10 +25,12 @@ class SendRemindersCommand extends Command
 
     /**
      * @param ReminderRunnerInterface $runner
+     * @param State $state
      * @param string|null $name
      */
     public function __construct(
         private readonly ReminderRunnerInterface $runner,
+        private readonly State $state,
         ?string $name = null
     ) {
         parent::__construct($name);
@@ -59,6 +64,8 @@ class SendRemindersCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $this->setAreaCode();
+
         $dryRun = (bool)$input->getOption(self::OPTION_DRY_RUN);
         $result = $this->runner->run($dryRun);
 
@@ -84,6 +91,25 @@ class SendRemindersCommand extends Command
             ));
 
         return $result->getSkippedCount() === 0 ? Cli::RETURN_SUCCESS : Cli::RETURN_FAILURE;
+    }
+
+    /**
+     * Set the crontab area code, matching what Magento's own cron scheduler does before a job runs.
+     *
+     * The CLI starts with no area code at all, but {@see ReminderSender} emulates the frontend per
+     * store on top of one. Some contexts (already running under a set area) throw when set again;
+     * that is tolerated, everything else is not.
+     *
+     * @return void
+     */
+    private function setAreaCode(): void
+    {
+        try {
+            $this->state->setAreaCode(Area::AREA_CRONTAB);
+        } catch (LocalizedException) {
+            // Area code already set by the surrounding context; nothing to do.
+            return;
+        }
     }
 
     /**
