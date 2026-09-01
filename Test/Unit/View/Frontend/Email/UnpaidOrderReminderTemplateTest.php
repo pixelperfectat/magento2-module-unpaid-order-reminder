@@ -82,6 +82,52 @@ class UnpaidOrderReminderTemplateTest extends TestCase
         );
     }
 
+    /**
+     * Magento's depend directive cannot nest.
+     *
+     * Magento\Framework\Filter\Template::CONSTRUCTION_DEPEND_PATTERN is
+     * '/{{depend\s*(.*?)}}(.*?){{\/depend\s*}}/si' - a non-greedy body that stops at the FIRST
+     * closing tag. An outer depend therefore closes on an inner one, and the outer's own
+     * {{/depend}} is left orphaned. CONSTRUCTION_PATTERN then matches that orphan with an empty
+     * directive name, and SimpleDirective::process() raises "Undefined array key directiveName".
+     *
+     * The whole body is replaced by that warning, so the shopper receives an error message where
+     * the payment details should be - while the runner still records the reminder as sent. Use
+     * {{if}} for the inner condition: it has a different closing tag, so the outer depend still
+     * finds its own.
+     */
+    public function testNoDependDirectiveIsNestedInsideAnother(): void
+    {
+        $contents = (string)file_get_contents($this->templatePath());
+
+        preg_match_all('/{{\/?depend\b[^}]*}}/i', $contents, $matches, PREG_OFFSET_CAPTURE);
+
+        $depth = 0;
+        foreach ($matches[0] as [$tag, $offset]) {
+            if (str_starts_with($tag, '{{/')) {
+                $depth--;
+                $this->assertGreaterThanOrEqual(
+                    0,
+                    $depth,
+                    sprintf('Unmatched {{/depend}} at offset %d.', $offset)
+                );
+                continue;
+            }
+
+            $depth++;
+            $this->assertLessThanOrEqual(
+                1,
+                $depth,
+                sprintf(
+                    'Nested {{depend}} at offset %d. Magento cannot parse it; use {{if}} inside.',
+                    $offset
+                )
+            );
+        }
+
+        $this->assertSame(0, $depth, 'A {{depend}} directive is never closed.');
+    }
+
     private function templatePath(): string
     {
         return __DIR__ . '/../../../../../view/frontend/email/unpaid_order_reminder.html';

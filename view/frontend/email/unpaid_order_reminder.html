@@ -25,9 +25,9 @@
 <table class="message-details">
     <tr><th>{{trans "Bank"}}</th><td>{{var bankName}}</td></tr>
     <tr><th>{{trans "Account"}}</th><td>{{var bankAccount}}</td></tr>
-    {{depend bankBic}}
+    {{if bankBic}}
     <tr><th>{{trans "BIC"}}</th><td>{{var bankBic}}</td></tr>
-    {{/depend}}
+    {{/if}}
     <tr><th>{{trans "Reference"}}</th><td><strong>{{var paymentReference}}</strong></td></tr>
     <tr><th>{{trans "Amount"}}</th><td>{{var formattedTotal}}</td></tr>
 </table>
