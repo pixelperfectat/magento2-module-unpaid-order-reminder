@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-09-01
+
+### Fixed
+
+- `bin/magento pixelperfect:unpaidorder:send-reminders` failed every order with "Area code is not set".
+  The command-line interface starts with no area code, but the sender emulates the frontend per store on
+  top of one. Cron was never affected, because Magento's scheduler sets the crontab area before it runs a
+  job. The command now sets that same area itself.
+
 ## [0.2.0] - 2026-09-01
 
 ### Fixed
