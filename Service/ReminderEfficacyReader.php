@@ -8,6 +8,7 @@ use PixelPerfect\UnpaidOrderReminder\Api\Data\ReminderEfficacyInterface;
 use PixelPerfect\UnpaidOrderReminder\Api\Service\ReminderEfficacyReaderInterface;
 use PixelPerfect\UnpaidOrderReminder\Model\Data\ReminderEfficacyFactory;
 use PixelPerfect\UnpaidOrderReminder\Model\ResourceModel\ReminderLog\CollectionFactory;
+use PixelPerfect\UnpaidOrderReminder\Service\Criterion\IsPendingPayment;
 use Zend_Db_Expr;
 
 /**
@@ -19,11 +20,17 @@ class ReminderEfficacyReader implements ReminderEfficacyReaderInterface
      * @param CollectionFactory $collectionFactory
      * @param ReminderEfficacyFactory $efficacyFactory
      * @param string $orderTable Overridable in di.xml.
+     * @param string[] $pendingStates States treated as "still unpaid" by the paid/still-unpaid/expired
+     *     partition below. Wired to {@see IsPendingPayment::PENDING_STATES} in etc/di.xml so this list
+     *     can never drift from the one the selection criterion and the runner's re-read guard use. An
+     *     order sitting in a pending state that is missing from this list would be miscounted as paid
+     *     the moment it is reminded - see the class-level note on the "paid" group below.
      */
     public function __construct(
         private readonly CollectionFactory $collectionFactory,
         private readonly ReminderEfficacyFactory $efficacyFactory,
-        private readonly string $orderTable = 'sales_order'
+        private readonly string $orderTable = 'sales_order',
+        private readonly array $pendingStates = IsPendingPayment::PENDING_STATES
     ) {
     }
 
@@ -41,24 +48,31 @@ class ReminderEfficacyReader implements ReminderEfficacyReaderInterface
         $resource = $collection->getResource();
         $connection = $resource->getConnection();
 
-        $pending = $connection->quote(Order::STATE_PENDING_PAYMENT);
+        $pendingList = implode(', ', array_map(
+            static fn (string $state): string => $connection->quote($state),
+            $this->pendingStates
+        ));
         $canceled = $connection->quote(Order::STATE_CANCELED);
 
-        // Paid: the order has left pending payment, and did so at or after the mail went out. Both
-        // columns are whole-second DATETIME, and sent_at is now stamped before the send (see
-        // ReminderRunner::processOrder()), so any post-reminder state change has an updated_at no
-        // earlier than sent_at by construction; the equal case is the one that remains genuinely
-        // possible within a second. An order paid a meaningful margin before the reminder was
-        // written is not credited to it.
-        $paid = sprintf('(so.state NOT IN (%s, %s) AND so.updated_at >= pp.sent_at)', $pending, $canceled);
+        // Paid: the order has left every pending state (STATE_NEW included - see IsPendingPayment for
+        // why an offline order's unpaid state is "new", not "pending_payment"), and did so at or after
+        // the mail went out. Both columns are whole-second DATETIME, and sent_at is now stamped before
+        // the send (see ReminderRunner::processOrder()), so any post-reminder state change has an
+        // updated_at no earlier than sent_at by construction; the equal case is the one that remains
+        // genuinely possible within a second. An order paid a meaningful margin before the reminder
+        // was written is not credited to it. Getting the excluded set wrong here is silent: an order
+        // reminded in a pending state this list omits would be counted as paid without ever having
+        // been paid.
+        $paid = sprintf('(so.state NOT IN (%s, %s) AND so.updated_at >= pp.sent_at)', $pendingList, $canceled);
         $stillUnpaid = sprintf(
-            '(so.state = %s AND (pp.expires_at IS NULL OR pp.expires_at > UTC_TIMESTAMP()))',
-            $pending
+            '(so.state IN (%s) AND (pp.expires_at IS NULL OR pp.expires_at > UTC_TIMESTAMP()))',
+            $pendingList
         );
         $expired = sprintf(
-            '(so.state = %s OR (so.state = %s AND pp.expires_at IS NOT NULL AND pp.expires_at <= UTC_TIMESTAMP()))',
+            '(so.state = %s OR (so.state IN (%s) AND pp.expires_at IS NOT NULL'
+            . ' AND pp.expires_at <= UTC_TIMESTAMP()))',
             $canceled,
-            $pending
+            $pendingList
         );
 
         $select = $connection->select()

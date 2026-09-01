@@ -96,7 +96,10 @@ class ReminderEfficacyReaderTest extends TestCase
      * The three outcome groups must partition the reminded population: their counts always sum to
      * the reminded count. This executes the reader's own generated SQL condition fragments — not a
      * reimplementation of them — against a fixture that includes an order whose updated_at lands in
-     * the very same second as its reminder's sent_at, the boundary the paid/orphan gap closed.
+     * the very same second as its reminder's sent_at, the boundary the paid/orphan gap closed, and an
+     * order in state "new" - the state Magento's offline payment methods actually use instead of
+     * "pending_payment". Before the fix, "new" was not excluded from the paid group, so a reminded
+     * offline order that was never paid was silently counted as a conversion.
      */
     public function testTheThreeGroupsSumToTheRemindedCountIncludingAnEqualTimestamp(): void
     {
@@ -127,12 +130,16 @@ class ReminderEfficacyReaderTest extends TestCase
         //    pending-state check and the send (the instructions lookup and expiry check run in
         //    between). Since sent_at is now captured before that window rather than after it, this
         //    row's updated_at falls after sent_at and lands in paid, not nowhere - the fix in round 2.
+        // 6: an offline order, still unpaid, sitting in state "new" - the state Magento's offline
+        //    payment methods actually use. Before this fix this row was miscounted as paid, because
+        //    "new" was not in the excluded set and its updated_at trivially satisfies ">= sent_at".
         $fixture = [
             [1, '2026-08-01 10:00:00', null, 'processing', '2026-08-01 10:00:00'],
             [2, '2026-08-01 10:00:00', null, 'pending_payment', '2026-08-01 10:00:00'],
             [3, '2026-08-01 10:00:00', '2026-08-05 00:00:00', 'pending_payment', '2026-08-01 10:00:00'],
             [4, '2026-08-01 10:00:00', null, 'canceled', '2026-08-01 10:00:00'],
             [5, '2026-08-01 10:00:00', null, 'processing', '2026-08-01 10:00:01'],
+            [6, '2026-08-01 10:00:00', null, 'new', '2026-08-01 10:00:00'],
         ];
         foreach ($fixture as [$orderId, $sentAt, $expiresAt, $state, $updatedAt]) {
             $insertPp->execute([$orderId, $sentAt, $expiresAt]);
@@ -149,13 +156,17 @@ class ReminderEfficacyReaderTest extends TestCase
         );
         $result = $pdo->query($sql)->fetch(PDO::FETCH_ASSOC);
 
-        $this->assertSame(5, (int)$result['reminded_count']);
+        $this->assertSame(6, (int)$result['reminded_count']);
         $this->assertSame(
             2,
             (int)$result['paid_count'],
             'the same-second payment and the one landing a second later must both count as paid'
         );
-        $this->assertSame(1, (int)$result['still_unpaid_count']);
+        $this->assertSame(
+            2,
+            (int)$result['still_unpaid_count'],
+            'an order in state "new" must land in still-unpaid, not be miscounted as paid'
+        );
         $this->assertSame(2, (int)$result['expired_count']);
         $this->assertSame(
             (int)$result['reminded_count'],

@@ -48,6 +48,21 @@
             </argument>
         </arguments>
     </type>
+    <!-- ReminderRunner's re-read guard and ReminderEfficacyReader's paid/still-unpaid/expired
+         partition both need to agree with IsPendingPayment on what "still awaiting payment" means -
+         see IsPendingPayment::PENDING_STATES for why the state list is wider than its name suggests.
+         Wiring both consumers to that one constant, rather than letting each carry its own default,
+         is what keeps the three from being able to drift apart. -->
+    <type name="PixelPerfect\UnpaidOrderReminder\Service\ReminderRunner">
+        <arguments>
+            <argument name="pendingStates" xsi:type="const">PixelPerfect\UnpaidOrderReminder\Service\Criterion\IsPendingPayment::PENDING_STATES</argument>
+        </arguments>
+    </type>
+    <type name="PixelPerfect\UnpaidOrderReminder\Service\ReminderEfficacyReader">
+        <arguments>
+            <argument name="pendingStates" xsi:type="const">PixelPerfect\UnpaidOrderReminder\Service\Criterion\IsPendingPayment::PENDING_STATES</argument>
+        </arguments>
+    </type>
     <type name="Magento\Framework\Console\CommandList">
         <arguments>
             <argument name="commands" xsi:type="array">

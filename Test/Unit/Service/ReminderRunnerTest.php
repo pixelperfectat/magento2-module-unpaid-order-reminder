@@ -26,6 +26,7 @@ use PixelPerfect\UnpaidOrderReminder\Model\ReminderLog;
 use PixelPerfect\UnpaidOrderReminder\Model\ReminderLogFactory;
 use PixelPerfect\UnpaidOrderReminder\Model\ResourceModel\Order\UnpaidCollection;
 use PixelPerfect\UnpaidOrderReminder\Model\ResourceModel\Order\UnpaidCollectionFactory;
+use PixelPerfect\UnpaidOrderReminder\Service\Criterion\IsPendingPayment;
 use PixelPerfect\UnpaidOrderReminder\Service\ReminderRunner;
 
 class ReminderRunnerTest extends TestCase
@@ -186,6 +187,43 @@ class ReminderRunnerTest extends TestCase
     }
 
     /**
+     * Spec regression: Magento's offline payment methods (banktransfer, checkmo, cashondelivery,
+     * purchaseorder) never reach STATE_PENDING_PAYMENT - they sit in STATE_NEW. The re-read guard must
+     * accept that state too, or every offline order is rejected as "no longer pending" and nobody who
+     * paid offline is ever reminded.
+     */
+    public function testSendsAReminderForAnOrderStillInStateNew(): void
+    {
+        $fresh = $this->createMock(Order::class);
+        $fresh->method('getState')->willReturn(Order::STATE_NEW);
+        $fresh->method('getStoreId')->willReturn(1);
+        $fresh->method('getGrandTotal')->willReturn(99.9);
+        $this->orderRepository->method('get')->willReturn($fresh);
+
+        $this->sender->expects($this->once())->method('send');
+
+        $result = $this->runner()->run();
+
+        $this->assertSame(1, $result->getSentCount());
+        $this->assertSame(0, $result->getSkippedCount());
+    }
+
+    /**
+     * The re-read guard's state list is a constructor argument (wired to
+     * IsPendingPayment::PENDING_STATES in etc/di.xml) rather than a hard-coded literal, so it must
+     * actually be consulted rather than merely defaulted.
+     */
+    public function testUsesTheInjectedPendingStatesListRatherThanAHardCodedOne(): void
+    {
+        $this->sender->expects($this->never())->method('send');
+
+        $result = $this->runner(null, null, null, ['awaiting_transfer'])->run();
+
+        $this->assertSame(1, $result->getSkippedCount());
+        $this->assertSame('no_longer_pending', $result->getSkipped()[0]['reason']);
+    }
+
+    /**
      * Spec §13: the log row is written only after the transport accepted the message, so a failed
      * send can never silently consume an order's one reminder.
      */
@@ -321,12 +359,14 @@ class ReminderRunnerTest extends TestCase
      * @param ReminderLog|null $log
      * @param LoggerInterface|null $logger
      * @param DateTime|null $dateTime
+     * @param string[]|null $pendingStates null keeps the runner's own default
      * @return ReminderRunner
      */
     private function runner(
         ?ReminderLog $log = null,
         ?LoggerInterface $logger = null,
-        ?DateTime $dateTime = null
+        ?DateTime $dateTime = null,
+        ?array $pendingStates = null
     ): ReminderRunner {
         $criterion = $this->createMock(ReminderCriterionInterface::class);
 
@@ -358,7 +398,8 @@ class ReminderRunnerTest extends TestCase
             $resultFactory,
             $this->orderRepository,
             $dateTime,
-            $logger ?? $this->createMock(LoggerInterface::class)
+            $logger ?? $this->createMock(LoggerInterface::class),
+            $pendingStates ?? IsPendingPayment::PENDING_STATES
         );
     }
 

@@ -6,7 +6,6 @@ namespace PixelPerfect\UnpaidOrderReminder\Service;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
-use Magento\Sales\Model\Order;
 use PixelPerfect\UnpaidOrderReminder\Api\Data\ReminderRunResultInterface;
 use PixelPerfect\UnpaidOrderReminder\Api\ReminderLogRepositoryInterface;
 use PixelPerfect\UnpaidOrderReminder\Api\Service\ConfigInterface;
@@ -17,6 +16,7 @@ use PixelPerfect\UnpaidOrderReminder\Api\Service\ReminderSenderInterface;
 use PixelPerfect\UnpaidOrderReminder\Model\Data\ReminderRunResultFactory;
 use PixelPerfect\UnpaidOrderReminder\Model\ReminderLogFactory;
 use PixelPerfect\UnpaidOrderReminder\Model\ResourceModel\Order\UnpaidCollectionFactory;
+use PixelPerfect\UnpaidOrderReminder\Service\Criterion\IsPendingPayment;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
@@ -28,7 +28,8 @@ use Throwable;
  * - No instructions means no mail and no log row: the order stays eligible for the next run.
  * - The log row is written only after the transport accepted the message.
  * - The order state is re-read immediately before sending, so a payment that arrived mid-run is
- *   never mailed a pointless reminder.
+ *   never mailed a pointless reminder. "Still pending" means any state in $pendingStates, not just
+ *   STATE_PENDING_PAYMENT - see {@see IsPendingPayment} for why.
  * - An expired payment window is skipped, never mailed.
  * - One failing order never stops the run.
  * - A dry run resolves instructions but neither sends nor logs.
@@ -51,6 +52,9 @@ class ReminderRunner implements ReminderRunnerInterface
      * @param OrderRepositoryInterface $orderRepository
      * @param DateTime $dateTime
      * @param LoggerInterface $logger
+     * @param string[] $pendingStates States treated as "still awaiting payment" by the re-read guard
+     *     immediately before sending. Wired to {@see IsPendingPayment::PENDING_STATES} in etc/di.xml
+     *     so this list can never drift from the one the selection criterion uses.
      */
     public function __construct(
         private readonly ConfigInterface $config,
@@ -63,7 +67,8 @@ class ReminderRunner implements ReminderRunnerInterface
         private readonly ReminderRunResultFactory $resultFactory,
         private readonly OrderRepositoryInterface $orderRepository,
         private readonly DateTime $dateTime,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly array $pendingStates = IsPendingPayment::PENDING_STATES
     ) {
     }
 
@@ -130,7 +135,7 @@ class ReminderRunner implements ReminderRunnerInterface
         // The selection ran as one query; a long run can outlive its results. Re-reading here is the
         // only thing standing between a payment that arrived mid-run and a pointless reminder.
         $current = $this->currentOrder($order, $orderId);
-        if ($current->getState() !== Order::STATE_PENDING_PAYMENT) {
+        if (!in_array($current->getState(), $this->pendingStates, true)) {
             return ['reason' => 'no_longer_pending'] + $row;
         }
 
