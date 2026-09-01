@@ -25,7 +25,7 @@ class PaymentInstructionsTest extends TestCase
     {
         $instructions = new PaymentInstructions(
             bankName: 'Example Bank',
-            bankAccount: 'NL55INGB0000000000',
+            bankAccount: 'NL00INGB0000000000',
             bankBic: 'INGBNL2A',
             reference: 'ABC-1234-DEF',
             expiresAt: '2026-09-15 04:00:00',
@@ -33,7 +33,7 @@ class PaymentInstructionsTest extends TestCase
         );
 
         $this->assertSame('Example Bank', $instructions->getBankName());
-        $this->assertSame('NL55INGB0000000000', $instructions->getBankAccount());
+        $this->assertSame('NL00INGB0000000000', $instructions->getBankAccount());
         $this->assertSame('INGBNL2A', $instructions->getBankBic());
         $this->assertSame('ABC-1234-DEF', $instructions->getReference());
         $this->assertSame('2026-09-15 04:00:00', $instructions->getExpiresAt());
@@ -59,14 +59,14 @@ class PaymentInstructionsTest extends TestCase
     {
         $complete = new PaymentInstructions(
             bankName: 'Example Bank',
-            bankAccount: 'NL55INGB0000000000',
+            bankAccount: 'NL00INGB0000000000',
             reference: 'ABC-1234-DEF'
         );
         $this->assertTrue($complete->hasStructuredBankDetails());
 
         $noReference = new PaymentInstructions(
             bankName: 'Example Bank',
-            bankAccount: 'NL55INGB0000000000'
+            bankAccount: 'NL00INGB0000000000'
         );
         $this->assertFalse($noReference->hasStructuredBankDetails());
 
