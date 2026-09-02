@@ -109,7 +109,7 @@ place_orders() {
         )
         [ -n "$store" ] && options+=("--store=$store")
         run_command "e2e-create-orders" \
-            pixelperfect:unpaidorder:e2e-create-orders "${options[@]}" >/dev/null
+            pixelperfect:unpaidorder:e2e-create-orders "${options[@]}"
     done < <(jq -c '.orders[]' "$case_file")
 }
 
@@ -132,7 +132,7 @@ run_case() {
     runs="$(jq -r '.runs // 1' "$case_file")"
 
     reset_failures
-    run_command "e2e-reset" pixelperfect:unpaidorder:e2e-reset >/dev/null
+    run_command "e2e-reset" pixelperfect:unpaidorder:e2e-reset
     write_scenario "$case_file"
     apply_config "$case_file"
     place_orders "$case_file"
@@ -141,7 +141,7 @@ run_case() {
     # expectation is a difference and not an absolute count.
     before="$(count_reminder_rows)"
     for ((i = 0; i < runs; i++)); do
-        run_command "send-reminders" pixelperfect:unpaidorder:send-reminders >/dev/null
+        run_command "send-reminders" pixelperfect:unpaidorder:send-reminders
     done
     after="$(count_reminder_rows)"
 
@@ -166,13 +166,13 @@ teardown() {
     local output status
     output="$(magento pixelperfect:unpaidorder:e2e-reset 2>&1)"
     status=$?
+    restore_config
     if [ "$status" -ne 0 ]; then
         printf 'Teardown failed: e2e-reset: exit %s: %s\n' \
             "$status" "$(printf '%s\n' "$output" | head -1)" >&2
         printf 'Fixture orders and captured mail may still be present.\n' >&2
         return 1
     fi
-    restore_config
     return 0
 }
 
