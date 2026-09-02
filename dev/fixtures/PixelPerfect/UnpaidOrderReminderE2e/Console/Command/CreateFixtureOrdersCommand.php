@@ -9,6 +9,7 @@ use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductColl
 use Magento\CatalogInventory\Helper\Stock;
 use Magento\Framework\App\Area;
 use Magento\Framework\App\AreaList;
+use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\State;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Stdlib\DateTime\DateTime;
@@ -18,6 +19,7 @@ use Magento\Quote\Model\QuoteFactory;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\ResourceModel\Order as OrderResource;
+use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -40,6 +42,13 @@ class CreateFixtureOrdersCommand extends Command
     private const OPTION_AGE_DAYS = 'age-days';
     private const OPTION_SKU = 'sku';
     private const OPTION_EMAIL = 'email';
+    private const OPTION_POSTCODE = 'postcode';
+
+    /**
+     * The installation's own default country. A hard-coded one is rejected by a shop that does not
+     * ship there, and the fixture would then fail for a reason unrelated to the code under test.
+     */
+    private const XML_PATH_DEFAULT_COUNTRY = 'general/country/default';
 
     /**
      * @param State $appState
@@ -52,6 +61,7 @@ class CreateFixtureOrdersCommand extends Command
      * @param OrderRepositoryInterface $orderRepository
      * @param OrderResource $orderResource
      * @param StoreManagerInterface $storeManager
+     * @param ScopeConfigInterface $scopeConfig
      * @param DateTime $dateTime
      * @param Stock $stockHelper
      * @param string|null $name
@@ -67,6 +77,7 @@ class CreateFixtureOrdersCommand extends Command
         private readonly OrderRepositoryInterface $orderRepository,
         private readonly OrderResource $orderResource,
         private readonly StoreManagerInterface $storeManager,
+        private readonly ScopeConfigInterface $scopeConfig,
         private readonly DateTime $dateTime,
         private readonly Stock $stockHelper,
         ?string $name = null
@@ -93,7 +104,8 @@ class CreateFixtureOrdersCommand extends Command
             )
             ->addOption(self::OPTION_AGE_DAYS, null, InputOption::VALUE_REQUIRED, 'Backdate created_at by days', '0')
             ->addOption(self::OPTION_SKU, null, InputOption::VALUE_REQUIRED, 'Product SKU to buy')
-            ->addOption(self::OPTION_EMAIL, null, InputOption::VALUE_REQUIRED, 'Guest email', 'jane.doe@example.com');
+            ->addOption(self::OPTION_EMAIL, null, InputOption::VALUE_REQUIRED, 'Guest email', 'jane.doe@example.com')
+            ->addOption(self::OPTION_POSTCODE, null, InputOption::VALUE_REQUIRED, 'Fixture postcode', '1010');
         parent::configure();
     }
 
@@ -134,8 +146,9 @@ class CreateFixtureOrdersCommand extends Command
 
             $sku = (string)($input->getOption(self::OPTION_SKU) ?? '');
             $sku = $sku !== '' ? $sku : $this->firstSalableSku($storeId);
+            $postcode = (string)$input->getOption(self::OPTION_POSTCODE);
             for ($i = 0; $i < $count; $i++) {
-                $output->writeln($this->placeOne($storeId, $method, $ageDays, $email, $sku));
+                $output->writeln($this->placeOne($storeId, $method, $ageDays, $email, $sku, $postcode));
             }
         } catch (Throwable $exception) {
             $output->writeln('<error>' . $exception->getMessage() . '</error>');
@@ -174,11 +187,18 @@ class CreateFixtureOrdersCommand extends Command
      * @param int $ageDays
      * @param string $email
      * @param string $sku
+     * @param string $postcode
      * @return string
      * @throws LocalizedException
      */
-    private function placeOne(int $storeId, string $method, int $ageDays, string $email, string $sku): string
-    {
+    private function placeOne(
+        int $storeId,
+        string $method,
+        int $ageDays,
+        string $email,
+        string $sku,
+        string $postcode
+    ): string {
         $product = $this->productRepository->get($sku, false, $storeId);
         if (!$product instanceof Product) {
             throw new LocalizedException(__('The fixture product "%1" is not a catalog product model.', $sku));
@@ -200,8 +220,8 @@ class CreateFixtureOrdersCommand extends Command
             'lastname' => 'Doe',
             'street' => ['1 Example Street'],
             'city' => 'Example City',
-            'postcode' => '1010',
-            'country_id' => 'AT',
+            'postcode' => $postcode,
+            'country_id' => $this->defaultCountryId($storeId),
             'telephone' => '0000000000',
             'email' => $email,
         ];
@@ -245,6 +265,28 @@ class CreateFixtureOrdersCommand extends Command
         }
 
         return (string)$order->getIncrementId();
+    }
+
+    /**
+     * Read the store's own default country for the fixture address.
+     *
+     * @param int $storeId
+     * @return string
+     * @throws LocalizedException
+     */
+    private function defaultCountryId(int $storeId): string
+    {
+        $value = $this->scopeConfig->getValue(
+            self::XML_PATH_DEFAULT_COUNTRY,
+            ScopeInterface::SCOPE_STORE,
+            $storeId
+        );
+        $countryId = is_string($value) ? $value : '';
+        if ($countryId === '') {
+            throw new LocalizedException(__('The store has no default country and the fixture has no address.'));
+        }
+
+        return $countryId;
     }
 
     /**
