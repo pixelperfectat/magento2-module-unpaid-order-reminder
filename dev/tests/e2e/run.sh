@@ -177,7 +177,7 @@ write_scenario() {
 }
 
 place_orders() {
-    local case_file="$1" line store
+    local case_file="$1" line store failed=0
     local -a options
     while read -r line; do
         [ -z "$line" ] && continue
@@ -190,8 +190,10 @@ place_orders() {
         )
         [ -n "$store" ] && options+=("--store=$store")
         run_command "e2e-create-orders" \
-            pixelperfect:unpaidorder:e2e-create-orders "${options[@]}"
+            pixelperfect:unpaidorder:e2e-create-orders "${options[@]}" || failed=1
     done < <(jq -c '.orders[]' "$case_file")
+
+    return "$failed"
 }
 
 # The stats command prints nothing countable until the first reminder exists, which reads as zero.
@@ -218,14 +220,23 @@ run_case() {
     exit_status="$(jq -r '.expect.exit_status // 0' "$case_file")"
 
     reset_failures
-    run_command "e2e-reset" pixelperfect:unpaidorder:e2e-reset
+    # A case that starts on the previous case's orders and mail proves nothing, so a failed reset
+    # ends it here rather than at an assertion about a count that was never going to be right.
+    if ! run_command "e2e-reset" pixelperfect:unpaidorder:e2e-reset; then
+        report_failures "$name"
+        return 1
+    fi
     write_scenario "$case_file"
     # Placing orders or sending now would run the case against whatever the shop's own rule selects.
     if ! apply_config "$case_file"; then
         report_failures "$name"
         return 1
     fi
-    place_orders "$case_file"
+    # A case that placed fewer orders than it asked for would send against an unknown set.
+    if ! place_orders "$case_file"; then
+        report_failures "$name"
+        return 1
+    fi
 
     # The database may already hold reminders for orders the suite never created, so the
     # expectation is a difference and not an absolute count.
