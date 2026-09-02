@@ -13,4 +13,12 @@
             </argument>
         </arguments>
     </type>
+
+    <type name="Magento\Framework\Console\CommandList">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="pixelperfect_unpaidorder_e2e_create_orders" xsi:type="object">PixelPerfect\UnpaidOrderReminderE2e\Console\Command\CreateFixtureOrdersCommand</item>
+            </argument>
+        </arguments>
+    </type>
 </config>
