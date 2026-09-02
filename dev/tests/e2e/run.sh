@@ -172,6 +172,24 @@ apply_config() {
     return "$failed"
 }
 
+# The rule map of a case names a real payment method, so on another database copy the same rule can
+# select real unpaid orders of that method. The dry run decides everything and sends nothing, so it
+# is safe to ask before a single fixture order exists: an empty selection at that moment proves
+# every order the case then sends to is one the case itself created.
+assert_no_real_order_selected() {
+    local output status
+    output="$(magento pixelperfect:unpaidorder:send-reminders --dry-run 2>&1)"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        case "$output" in
+            *"No order qualifies for a reminder."*) return 0 ;;
+        esac
+    fi
+
+    add_failure "config: the case rule selects orders the suite did not create; refusing to run"
+    return 1
+}
+
 write_scenario() {
     jq -c '.scenario' "$1" | mshell "mkdir -p $E2E_DIR && cat > $E2E_DIR/scenario.json"
 }
@@ -229,6 +247,10 @@ run_case() {
     write_scenario "$case_file"
     # Placing orders or sending now would run the case against whatever the shop's own rule selects.
     if ! apply_config "$case_file"; then
+        report_failures "$name"
+        return 1
+    fi
+    if ! assert_no_real_order_selected; then
         report_failures "$name"
         return 1
     fi
