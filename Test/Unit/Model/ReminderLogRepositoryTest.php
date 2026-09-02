@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace PixelPerfect\UnpaidOrderReminder\Test\Unit\Model;
 
+use Magento\Framework\Exception\CouldNotDeleteException;
 use Magento\Framework\Exception\CouldNotSaveException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -80,5 +81,37 @@ class ReminderLogRepositoryTest extends TestCase
 
         $this->assertTrue($this->repository->hasBeenReminded(900));
         $this->assertFalse($this->repository->hasBeenReminded(901));
+    }
+
+    public function testDeleteByOrderIdReturnsFalseWhenNoRowExists(): void
+    {
+        $log = $this->createMock(ReminderLog::class);
+        $log->method('getId')->willReturn(null);
+        $this->factory->method('create')->willReturn($log);
+        $this->resource->expects($this->never())->method('delete');
+
+        $this->assertFalse($this->repository->deleteByOrderId(900));
+    }
+
+    public function testDeleteByOrderIdDeletesTheRowAndReturnsTrue(): void
+    {
+        $log = $this->createMock(ReminderLog::class);
+        $log->method('getId')->willReturn(3);
+        $this->factory->method('create')->willReturn($log);
+        $this->resource->expects($this->once())->method('delete')->with($log);
+
+        $this->assertTrue($this->repository->deleteByOrderId(900));
+    }
+
+    public function testDeleteByOrderIdTurnsAResourceFailureIntoACouldNotDeleteException(): void
+    {
+        $log = $this->createMock(ReminderLog::class);
+        $log->method('getId')->willReturn(3);
+        $this->factory->method('create')->willReturn($log);
+        $this->resource->method('delete')->willThrowException(new \Exception('locked'));
+
+        $this->expectException(CouldNotDeleteException::class);
+
+        $this->repository->deleteByOrderId(900);
     }
 }
