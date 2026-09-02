@@ -260,15 +260,38 @@ count_mail() {
     printf '%s' "${count//[[:space:]]/}"
 }
 
+# jq answers null for a field a case forgot, and the runner would then write "null" into the
+# configuration and place orders against it. Every field the runner reads is checked once, here.
+assert_case_schema() {
+    jq -e '
+        (.name | type == "string")
+        and (.config.enabled | type == "string")
+        and (.config.max_age_days | type == "string")
+        and (.config.rules | type == "object")
+        and (.scenario | type == "object")
+        and (.orders | type == "array" and length > 0)
+        and all(.orders[]; (.method | type == "string") and (.age_days | type == "number"))
+        and (.expect.reminder_rows | type == "number")
+        and (.expect.mails | type == "number")
+    ' "$1" >/dev/null 2>&1
+}
+
 run_case() {
     local case_file="$1"
     local name runs i before after mails exit_status
     local counted_before=1 counted_after=1
+
+    reset_failures
+    if ! assert_case_schema "$case_file"; then
+        add_failure "case file is invalid: $case_file"
+        report_failures "$(basename "$case_file")"
+        return 1
+    fi
+
     name="$(jq -r '.name' "$case_file")"
     runs="$(jq -r '.runs // 1' "$case_file")"
     exit_status="$(jq -r '.expect.exit_status // 0' "$case_file")"
 
-    reset_failures
     # A case that starts on the previous case's orders and mail proves nothing, so a failed reset
     # ends it here rather than at an assertion about a count that was never going to be right.
     if ! run_command "e2e-reset" pixelperfect:unpaidorder:e2e-reset; then
