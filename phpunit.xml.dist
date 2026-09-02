@@ -8,6 +8,7 @@
     <testsuites>
         <testsuite name="unit">
             <directory suffix="Test.php">Test/Unit</directory>
+            <directory suffix="Test.php">dev/fixtures</directory>
         </testsuite>
     </testsuites>
 </phpunit>
