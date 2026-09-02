@@ -141,7 +141,14 @@ class ResetFixturesCommand extends Command
                 $directory->delete('tmp/e2e');
             }
         } catch (Throwable $exception) {
-            $output->writeln('<error>' . $exception->getMessage() . '</error>');
+            // What was already removed decides what the operator still has to clean up by hand.
+            $output->writeln(sprintf(
+                '<error>Reset stopped after %d orders, %d reminder rows, %d quotes: %s</error>',
+                $orders,
+                $reminders,
+                $quotes,
+                $exception->getMessage()
+            ));
             return Command::FAILURE;
         } finally {
             $this->registry->unregister('isSecureArea');
