@@ -1,0 +1,20 @@
+{
+  "name": "Case 15 - free-text instructions render and the bank block does not",
+  "config": {
+    "enabled": "1",
+    "max_age_days": "30",
+    "rules": { "checkmo": { "delay_days": 5, "email_template": "unpaid_order_reminder_default" } }
+  },
+  "scenario": {
+    "kind": "text",
+    "instructions_html": "<p>Pay into the account shown on your invoice.</p>"
+  },
+  "orders": [ { "method": "checkmo", "age_days": 10, "count": 1 } ],
+  "runs": 1,
+  "expect": {
+    "reminder_rows": 1,
+    "mails": 1,
+    "body_contains": ["Pay into the account shown on your invoice."],
+    "body_not_contains": ["TESTNL10"]
+  }
+}

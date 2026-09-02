@@ -1,0 +1,31 @@
+{
+  "name": "Case 12 - the bank block, the amount and the deadline all render",
+  "config": {
+    "enabled": "1",
+    "max_age_days": "30",
+    "rules": { "checkmo": { "delay_days": 5, "email_template": "unpaid_order_reminder_default" } }
+  },
+  "scenario": {
+    "kind": "bank",
+    "bank_name": "Example Bank",
+    "bank_account": "NL10TEST000100100",
+    "bank_bic": "TESTNL10",
+    "reference": "RF00-0000-0000-0012",
+    "expires_at": "2026-12-31 04:00:00",
+    "payment_url": "https://example.com/pay/case-12"
+  },
+  "orders": [ { "method": "checkmo", "age_days": 10, "count": 1 } ],
+  "runs": 1,
+  "expect": {
+    "reminder_rows": 1,
+    "mails": 1,
+    "body_contains": [
+      "Example Bank",
+      "NL10TEST000100100",
+      "TESTNL10",
+      "RF00-0000-0000-0012",
+      "https://example.com/pay/case-12",
+      "31.12.2026"
+    ]
+  }
+}
