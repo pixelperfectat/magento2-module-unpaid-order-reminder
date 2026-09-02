@@ -9,6 +9,7 @@ use Magento\Framework\App\State;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Filesystem;
 use Magento\Framework\Registry;
+use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
@@ -35,9 +36,15 @@ class ResetFixturesCommand extends Command
     private const RESERVED_DOMAINS = ['@example.com', '@example.org', '@example.net', '@example.test'];
 
     /**
+     * The quote table's own email column. CartInterface declares no constant for it.
+     */
+    private const QUOTE_CUSTOMER_EMAIL = 'customer_email';
+
+    /**
      * @param State $appState
      * @param OrderRepositoryInterface $orderRepository
      * @param OrderResource $orderResource
+     * @param CartRepositoryInterface $quoteRepository
      * @param SearchCriteriaBuilder $searchCriteriaBuilder
      * @param ReminderLogRepositoryInterface $reminderLogRepository
      * @param Filesystem $filesystem
@@ -48,6 +55,7 @@ class ResetFixturesCommand extends Command
         private readonly State $appState,
         private readonly OrderRepositoryInterface $orderRepository,
         private readonly OrderResource $orderResource,
+        private readonly CartRepositoryInterface $quoteRepository,
         private readonly SearchCriteriaBuilder $searchCriteriaBuilder,
         private readonly ReminderLogRepositoryInterface $reminderLogRepository,
         private readonly Filesystem $filesystem,
@@ -85,6 +93,7 @@ class ResetFixturesCommand extends Command
 
         $orders = 0;
         $reminders = 0;
+        $quotes = 0;
 
         // The core refuses to delete a sales model unless the caller has declared the secure area,
         // which normally only the admin does.
@@ -107,6 +116,18 @@ class ResetFixturesCommand extends Command
                 }
             }
 
+            // Every placed order leaves its quote behind, and a run that failed halfway leaves one
+            // with no order at all. Both are fixture rows and both are addressed to a reserved domain.
+            foreach (self::RESERVED_DOMAINS as $domain) {
+                $criteria = $this->searchCriteriaBuilder
+                    ->addFilter(self::QUOTE_CUSTOMER_EMAIL, '%' . $domain, 'like')
+                    ->create();
+                foreach ($this->quoteRepository->getList($criteria)->getItems() as $quote) {
+                    $this->quoteRepository->delete($quote);
+                    $quotes++;
+                }
+            }
+
             $directory = $this->filesystem->getDirectoryWrite(DirectoryList::VAR_DIR);
             if ($directory->isDirectory('tmp/e2e')) {
                 $directory->delete('tmp/e2e');
@@ -118,7 +139,12 @@ class ResetFixturesCommand extends Command
             $this->registry->unregister('isSecureArea');
         }
 
-        $output->writeln(sprintf('Removed %d orders, %d reminder rows, and all captured mail.', $orders, $reminders));
+        $output->writeln(sprintf(
+            'Removed %d orders, %d reminder rows, %d quotes, and all captured mail.',
+            $orders,
+            $reminders,
+            $quotes
+        ));
 
         return Command::SUCCESS;
     }
