@@ -24,12 +24,12 @@
 {{depend hasBankDetails}}
 <table class="message-details">
     <tr><th>{{trans "Bank"}}</th><td>{{var bankName}}</td></tr>
-    <tr><th>{{trans "Account"}}</th><td>{{var bankAccount}}</td></tr>
+    <tr><th>{{trans "Account number"}}</th><td>{{var bankAccount}}</td></tr>
     {{if bankBic}}
     <tr><th>{{trans "BIC"}}</th><td>{{var bankBic}}</td></tr>
     {{/if}}
-    <tr><th>{{trans "Reference"}}</th><td><strong>{{var paymentReference}}</strong></td></tr>
-    <tr><th>{{trans "Amount"}}</th><td>{{var formattedTotal}}</td></tr>
+    <tr><th>{{trans "Payment reference"}}</th><td><strong>{{var paymentReference}}</strong></td></tr>
+    <tr><th>{{trans "Amount due"}}</th><td>{{var formattedTotal}}</td></tr>
 </table>
 <p>{{trans "Please quote the reference exactly. Without it the payment cannot be matched to your order."}}</p>
 {{/depend}}
