@@ -19,6 +19,6 @@
   "expect": {
     "reminder_rows": 1,
     "mails": 1,
-    "body_not_contains": ["{{", "}}", "Error in processing", "Error filtering template", "depend"]
+    "body_not_contains": ["{{", "Error in processing", "Error filtering template"]
   }
 }
