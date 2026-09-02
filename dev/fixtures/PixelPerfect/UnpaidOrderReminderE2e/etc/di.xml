@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <!-- Nothing may leave this installation while the fixture module is enabled. -->
+    <preference for="Magento\Framework\Mail\TransportInterface"
+                type="PixelPerfect\UnpaidOrderReminderE2e\Mail\CollectingTransport"/>
+
+    <!-- Replace one entry in the core's own registry of describable methods. banktransfer keeps the
+         real OfflineInstructions provider, so the offline path is still exercised by production code. -->
+    <type name="PixelPerfect\UnpaidOrderReminder\Service\Instructions\ProviderPool">
+        <arguments>
+            <argument name="providers" xsi:type="array">
+                <item name="checkmo" xsi:type="object">PixelPerfect\UnpaidOrderReminderE2e\Service\ScenarioInstructions</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <type name="Magento\Framework\Console\CommandList">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="pixelperfect_unpaidorder_e2e_create_orders" xsi:type="object">PixelPerfect\UnpaidOrderReminderE2e\Console\Command\CreateFixtureOrdersCommand</item>
+                <item name="pixelperfect_unpaidorder_e2e_reset" xsi:type="object">PixelPerfect\UnpaidOrderReminderE2e\Console\Command\ResetFixturesCommand</item>
+            </argument>
+        </arguments>
+    </type>
+</config>

@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- An end-to-end suite under `dev/`, with a fixture module, a scenario-driven instructions provider,
+  a collecting mail transport and a data-driven runner.
+- `ReminderLogRepositoryInterface::deleteByOrderId(int $orderId): bool`, which deletes the reminder log
+  row of an order and reports whether there was one. The end-to-end teardown has to remove what it
+  created; without it, the only way to do that was to reach into the table.
+
 ## [0.3.0] - 2026-09-01
 
 ### Added

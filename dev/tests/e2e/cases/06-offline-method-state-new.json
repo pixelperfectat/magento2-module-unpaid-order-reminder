@@ -1,0 +1,12 @@
+{
+  "name": "Case 6 - an offline order in state new is selected by the real offline provider",
+  "config": {
+    "enabled": "1",
+    "max_age_days": "30",
+    "rules": { "banktransfer": { "delay_days": 5, "email_template": "unpaid_order_reminder_default" } }
+  },
+  "scenario": { "kind": "fail" },
+  "orders": [ { "method": "banktransfer", "age_days": 10, "count": 1 } ],
+  "runs": 1,
+  "expect": { "reminder_rows": 1, "mails": 1 }
+}

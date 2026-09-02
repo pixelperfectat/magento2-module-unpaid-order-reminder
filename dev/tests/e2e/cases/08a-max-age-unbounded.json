@@ -1,0 +1,15 @@
+{
+  "name": "Case 8a - with no maximum age, a very old order is still selected",
+  "config": {
+    "enabled": "1",
+    "max_age_days": "0",
+    "rules": { "checkmo": { "delay_days": 5, "email_template": "unpaid_order_reminder_default" } }
+  },
+  "scenario": {
+    "kind": "text",
+    "instructions_html": "<p>Pay into the account shown on your invoice.</p>"
+  },
+  "orders": [ { "method": "checkmo", "age_days": 270, "count": 1 } ],
+  "runs": 1,
+  "expect": { "reminder_rows": 1, "mails": 1 }
+}

@@ -40,6 +40,20 @@ spl_autoload_register(static function (string $class) use ($moduleRoot): void {
     }
 });
 
+// The fixture module ships under dev/ with its own namespace, so the core PSR-4 prefix misses it.
+spl_autoload_register(static function (string $class) use ($moduleRoot): void {
+    $prefix = 'PixelPerfect\\UnpaidOrderReminderE2e\\';
+    if (strncmp($class, $prefix, strlen($prefix)) !== 0) {
+        return;
+    }
+    $relative = substr($class, strlen($prefix));
+    $file = $moduleRoot . '/dev/fixtures/PixelPerfect/UnpaidOrderReminderE2e/'
+        . str_replace('\\', '/', $relative) . '.php';
+    if (is_file($file)) {
+        require $file;
+    }
+});
+
 $generationDirectory = sys_get_temp_dir() . '/pixelperfect-unpaid-order-reminder-generated';
 if (!is_dir($generationDirectory)) {
     mkdir($generationDirectory, 0775, true);

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace PixelPerfect\UnpaidOrderReminder\Model;
 
+use Magento\Framework\Exception\CouldNotDeleteException;
 use Magento\Framework\Exception\CouldNotSaveException;
 use PixelPerfect\UnpaidOrderReminder\Api\Data\ReminderLogInterface;
 use PixelPerfect\UnpaidOrderReminder\Api\ReminderLogRepositoryInterface;
@@ -73,5 +74,29 @@ class ReminderLogRepository implements ReminderLogRepositoryInterface
     public function hasBeenReminded(int $orderId): bool
     {
         return $this->getByOrderId($orderId) !== null;
+    }
+
+    /**
+     * Delete the reminder row of an order, if one exists.
+     *
+     * @param int $orderId
+     * @return bool true when a row was deleted, false when the order had none
+     * @throws CouldNotDeleteException
+     */
+    public function deleteByOrderId(int $orderId): bool
+    {
+        $log = $this->getByOrderId($orderId);
+        if ($log === null) {
+            return false;
+        }
+
+        try {
+            /** @var ReminderLog $log */
+            $this->resource->delete($log);
+        } catch (\Exception $exception) {
+            throw new CouldNotDeleteException(__('Could not delete the reminder log.'), $exception);
+        }
+
+        return true;
     }
 }

@@ -71,6 +71,16 @@ start populating it.
 Implement `PixelPerfect\UnpaidOrderReminder\Api\Service\PaymentInstructionsProviderInterface` and add it
 to the provider pool in your own `di.xml`. See the Mollie package for a worked example.
 
+## End-to-end suite
+
+A scripted suite under `dev/` proves the reminder against a real Magento installation: real orders, the
+real selection run, the real templates. It sends nothing — a fixture module captures every message to
+disk — and it deletes only orders addressed to an RFC 2606 reserved domain. Nothing under `dev/` is
+autoloaded or enabled by installing this package; the fixture module is copied into `app/code` by hand
+and only ever on a development installation. That step stays manual on purpose: the runner never
+writes to `app/code` and never runs `setup:upgrade`, because both change the installation's own
+configuration files. See [`dev/tests/e2e/README.md`](dev/tests/e2e/README.md).
+
 ## Licence
 
 MIT.

@@ -10,3 +10,4 @@ parameters:
         - Cron
         - Model
         - Service
+        - dev/fixtures
