@@ -15,6 +15,16 @@
 #
 # Usage: dev/tests/e2e/run.sh [--keep]
 # --keep leaves the fixture orders, the captured mail and the last case's configuration in place.
+#
+# Case fields:
+#   name           what the case proves, printed with its result
+#   config         enabled, max_age_days and rules, written before the case runs
+#   scenario       the instructions scenario the fixture provider answers with
+#   orders         the fixture orders to place: method, age_days, count, and an optional store
+#   runs           how many times to run the send command (default: 1)
+#   expect         reminder_rows, mails, and the optional body_contains / body_not_contains lists,
+#                  plus exit_status (optional, default 0): the status the send command itself must
+#                  return. It exits non-zero whenever it skipped an order, which a case may assert.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -55,6 +65,18 @@ run_command() {
         add_failure "$label: exit $status: $(printf '%s\n' "$output" | head -1)"
     fi
     return "$status"
+}
+
+# The send command exits non-zero whenever it skipped an order, and a case may assert exactly that,
+# so its status is compared with the expectation rather than required to be zero.
+run_send_reminders() {
+    local expected="$1"
+    local output status
+    output="$(magento pixelperfect:unpaidorder:send-reminders 2>&1)"
+    status=$?
+    if [ "$status" -ne "$expected" ]; then
+        add_failure "send-reminders: expected exit $expected, got $status: $(printf '%s\n' "$output" | head -1)"
+    fi
 }
 
 record_config() {
@@ -127,9 +149,10 @@ count_mail() { mshell "ls $E2E_DIR/mails/*.eml 2>/dev/null | wc -l" | tr -d ' ';
 
 run_case() {
     local case_file="$1"
-    local name runs i before after
+    local name runs i before after exit_status
     name="$(jq -r '.name' "$case_file")"
     runs="$(jq -r '.runs // 1' "$case_file")"
+    exit_status="$(jq -r '.expect.exit_status // 0' "$case_file")"
 
     reset_failures
     run_command "e2e-reset" pixelperfect:unpaidorder:e2e-reset
@@ -141,7 +164,7 @@ run_case() {
     # expectation is a difference and not an absolute count.
     before="$(count_reminder_rows)"
     for ((i = 0; i < runs; i++)); do
-        run_command "send-reminders" pixelperfect:unpaidorder:send-reminders
+        run_send_reminders "$exit_status"
     done
     after="$(count_reminder_rows)"
 
