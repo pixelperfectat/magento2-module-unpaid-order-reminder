@@ -246,10 +246,6 @@ class CreateFixtureOrdersCommand extends Command
         $quote->setInventoryProcessed(false);
         $quote->collectTotals();
 
-        // Saved before the payment is touched: on a quote with no id, getPayment() reads an
-        // unfiltered payment collection and hands back a payment that belongs to no quote.
-        $this->quoteRepository->save($quote);
-
         // The payment method is set after collectTotals. Setting it before makes the total
         // recalculation drop it, which produces an order with no payment.
         $quote->getPayment()->importData(['method' => $method]);
