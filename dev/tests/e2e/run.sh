@@ -3,6 +3,8 @@
 #
 # It never sends mail: the fixture module binds a transport that writes every message to a file.
 # It never deletes an order whose email is not on a reserved domain.
+# It never runs a case whose configuration did not apply: the shop's own rule would then still be in
+# force, and the case would place orders and send against whatever real orders that rule selects.
 #
 # Environment:
 #   MAGENTO_ROOT   directory the commands run from (default: the current directory)
@@ -88,11 +90,19 @@ record_config() {
 }
 
 restore_config() {
-    local index
+    local index failed=0
     for index in "${!CFG_PATHS[@]}"; do
-        magento config:set "$CFG_PREFIX/${CFG_PATHS[$index]}" "${SAVED_CONFIG[$index]}" >/dev/null
+        if ! magento config:set "$CFG_PREFIX/${CFG_PATHS[$index]}" "${SAVED_CONFIG[$index]}" \
+            >/dev/null 2>&1; then
+            printf 'Restore failed for %s/%s; set it yourself:\n' \
+                "$CFG_PREFIX" "${CFG_PATHS[$index]}" >&2
+            print_saved_config >&2
+            failed=1
+        fi
     done
     magento cache:flush >/dev/null
+
+    return "$failed"
 }
 
 print_saved_config() {
@@ -102,15 +112,30 @@ print_saved_config() {
     done
 }
 
+# config:set can refuse the whole shop at once - it is disabled outright while app/etc/config.php is
+# out of step with the imported snapshot - and it says so on stdout with nothing on stderr. Discarding
+# that left every case running against the shop's own rule and its real orders, so each write is
+# checked and the rule is read back before the case is allowed to proceed.
 apply_config() {
     local case_file="$1"
-    magento config:set "$CFG_PREFIX/general/enabled" \
-        "$(jq -r '.config.enabled' "$case_file")" >/dev/null
-    magento config:set "$CFG_PREFIX/general/max_age_days" \
-        "$(jq -r '.config.max_age_days' "$case_file")" >/dev/null
-    magento config:set "$CFG_PREFIX/rules/methods" \
-        "$(jq -c '.config.rules' "$case_file")" >/dev/null
+    local rules actual failed=0
+
+    run_command "config:set general/enabled" config:set "$CFG_PREFIX/general/enabled" \
+        "$(jq -r '.config.enabled' "$case_file")" || failed=1
+    run_command "config:set general/max_age_days" config:set "$CFG_PREFIX/general/max_age_days" \
+        "$(jq -r '.config.max_age_days' "$case_file")" || failed=1
+    rules="$(jq -c '.config.rules' "$case_file")"
+    run_command "config:set rules/methods" config:set "$CFG_PREFIX/rules/methods" \
+        "$rules" || failed=1
     magento cache:flush >/dev/null
+
+    actual="$(magento config:show "$CFG_PREFIX/rules/methods" 2>/dev/null | head -1)"
+    if [ "$actual" != "$rules" ]; then
+        add_failure "config: rules/methods is '$actual', expected '$rules'"
+        failed=1
+    fi
+
+    return "$failed"
 }
 
 write_scenario() {
@@ -157,7 +182,11 @@ run_case() {
     reset_failures
     run_command "e2e-reset" pixelperfect:unpaidorder:e2e-reset
     write_scenario "$case_file"
-    apply_config "$case_file"
+    # Placing orders or sending now would run the case against whatever the shop's own rule selects.
+    if ! apply_config "$case_file"; then
+        report_failures "$name"
+        return 1
+    fi
     place_orders "$case_file"
 
     # The database may already hold reminders for orders the suite never created, so the
@@ -186,17 +215,19 @@ run_case() {
 }
 
 teardown() {
-    local output status
+    local output status restore_status
     output="$(magento pixelperfect:unpaidorder:e2e-reset 2>&1)"
     status=$?
     restore_config
+    restore_status=$?
     if [ "$status" -ne 0 ]; then
         printf 'Teardown failed: e2e-reset: exit %s: %s\n' \
             "$status" "$(printf '%s\n' "$output" | head -1)" >&2
         printf 'Fixture orders and captured mail may still be present.\n' >&2
         return 1
     fi
-    return 0
+
+    return "$restore_status"
 }
 
 main() {
