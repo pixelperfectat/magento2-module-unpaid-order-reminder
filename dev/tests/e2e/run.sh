@@ -152,22 +152,30 @@ print_saved_config() {
 # checked and the rule is read back before the case is allowed to proceed.
 apply_config() {
     local case_file="$1"
-    local rules actual failed=0
+    local index path actual failed=0
+    local -a wanted
 
-    run_command "config:set general/enabled" config:set "$CFG_PREFIX/general/enabled" \
-        "$(jq -r '.config.enabled' "$case_file")" || failed=1
-    run_command "config:set general/max_age_days" config:set "$CFG_PREFIX/general/max_age_days" \
-        "$(jq -r '.config.max_age_days' "$case_file")" || failed=1
-    rules="$(jq -c '.config.rules' "$case_file")"
-    run_command "config:set rules/methods" config:set "$CFG_PREFIX/rules/methods" \
-        "$rules" || failed=1
-    magento cache:flush >/dev/null
+    # Same order as CFG_PATHS.
+    wanted=(
+        "$(jq -r '.config.enabled' "$case_file")"
+        "$(jq -r '.config.max_age_days' "$case_file")"
+        "$(jq -c '.config.rules' "$case_file")"
+    )
 
-    actual="$(magento config:show "$CFG_PREFIX/rules/methods" 2>/dev/null | head -1)"
-    if [ "$actual" != "$rules" ]; then
-        add_failure "config: rules/methods is '$actual', expected '$rules'"
-        failed=1
-    fi
+    for index in "${!CFG_PATHS[@]}"; do
+        run_command "config:set ${CFG_PATHS[$index]}" config:set \
+            "$CFG_PREFIX/${CFG_PATHS[$index]}" "${wanted[$index]}" || failed=1
+    done
+    run_command "cache:flush" cache:flush || failed=1
+
+    for index in "${!CFG_PATHS[@]}"; do
+        path="${CFG_PATHS[$index]}"
+        actual="$(magento config:show "$CFG_PREFIX/$path" 2>/dev/null | head -1)"
+        if [ "$actual" != "${wanted[$index]}" ]; then
+            add_failure "config: $path is '$actual', expected '${wanted[$index]}'"
+            failed=1
+        fi
+    done
 
     return "$failed"
 }
