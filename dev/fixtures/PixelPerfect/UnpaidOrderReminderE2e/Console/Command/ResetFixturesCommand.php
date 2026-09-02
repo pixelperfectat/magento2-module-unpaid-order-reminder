@@ -41,6 +41,11 @@ class ResetFixturesCommand extends Command
     private const QUOTE_CUSTOMER_EMAIL = 'customer_email';
 
     /**
+     * The only order states the suite ever produces.
+     */
+    private const DELETABLE_STATES = [Order::STATE_NEW, Order::STATE_PENDING_PAYMENT];
+
+    /**
      * @param State $appState
      * @param OrderRepositoryInterface $orderRepository
      * @param OrderResource $orderResource
@@ -101,8 +106,11 @@ class ResetFixturesCommand extends Command
 
         try {
             foreach (self::RESERVED_DOMAINS as $domain) {
+                // The suite creates unpaid orders and nothing else, so anything further along was
+                // not created here even if it happens to carry a reserved address.
                 $criteria = $this->searchCriteriaBuilder
                     ->addFilter(OrderInterface::CUSTOMER_EMAIL, '%' . $domain, 'like')
+                    ->addFilter(OrderInterface::STATE, self::DELETABLE_STATES, 'in')
                     ->create();
                 foreach ($this->orderRepository->getList($criteria)->getItems() as $order) {
                     if (!$order instanceof Order) {
