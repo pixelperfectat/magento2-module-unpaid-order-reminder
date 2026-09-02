@@ -6,6 +6,8 @@
 # It never runs a case whose configuration did not apply: the shop's own rule would then still be in
 # force, and the case would place orders and send against whatever real orders that rule selects.
 #
+# Requires jq, and perl with the core MIME::QuotedPrint module for decoding the captured mail.
+#
 # Environment:
 #   MAGENTO_ROOT   directory the commands run from (default: the current directory)
 #   MAGENTO_CLI    the Magento console, relative to MAGENTO_ROOT (default: bin/magento)
@@ -51,8 +53,9 @@ magento() { ( cd "$MAGENTO_ROOT" && $MAGENTO_CLI "$@" ); }
 # shellcheck disable=SC2086
 mshell() { ( cd "$MAGENTO_ROOT" && $MAGENTO_SHELL "$1" ); }
 
-require_jq() {
+require_tools() {
     command -v jq >/dev/null 2>&1 || { echo "jq is required"; exit 2; }
+    command -v perl >/dev/null 2>&1 || { echo "perl is required"; exit 2; }
 }
 
 # Runs a Magento command and records a case failure when it fails, so the operator sees the real
@@ -168,7 +171,11 @@ count_reminder_rows() {
     printf '%s' "${count:-0}"
 }
 
-collected_mail() { mshell "cat $E2E_DIR/mails/*.eml 2>/dev/null"; }
+# Magento encodes the HTML part as quoted-printable, so a URL or a date can be soft-wrapped across
+# two lines. Every body assertion runs on the decoded text instead.
+collected_mail() {
+    mshell "cat $E2E_DIR/mails/*.eml 2>/dev/null" | perl -MMIME::QuotedPrint -pe '$_ = decode_qp($_)'
+}
 
 count_mail() { mshell "ls $E2E_DIR/mails/*.eml 2>/dev/null | wc -l" | tr -d ' '; }
 
@@ -231,7 +238,7 @@ teardown() {
 }
 
 main() {
-    require_jq
+    require_tools
     local failed=0 case_file
     printf 'Unpaid order reminder end-to-end suite\n\n'
     record_config
