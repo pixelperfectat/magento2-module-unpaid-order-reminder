@@ -140,8 +140,10 @@ class CreateFixtureOrdersCommand extends Command
 
         try {
             $this->ensureFrontendArea();
+            // Resolved through the store manager, so an id or code that does not exist says so
+            // instead of silently casting to store 0 and placing orders in the admin store.
             $storeId = $storeOption !== null
-                ? (int)$storeOption
+                ? (int)$this->storeManager->getStore((string)$storeOption)->getId()
                 : (int)$this->storeManager->getDefaultStoreView()->getId();
 
             $sku = (string)($input->getOption(self::OPTION_SKU) ?? '');
