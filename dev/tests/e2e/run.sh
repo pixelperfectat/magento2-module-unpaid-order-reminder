@@ -45,6 +45,11 @@ KEEP="${KEEP:-0}"
 E2E_DIR="var/tmp/e2e"
 CFG_PREFIX="pixelperfect_unpaid_order_reminder"
 CFG_PATHS=("general/enabled" "general/max_age_days" "rules/methods")
+# The defaults in etc/config.xml, in the order of CFG_PATHS.
+CFG_DEFAULTS=("0" "30" "{}")
+# config:show prints an empty string for a value that lives only in config.xml, and writing that
+# empty string back would turn an inherited value into an explicit one.
+CFG_UNSET="__unset__"
 SAVED_CONFIG=()
 
 # MAGENTO_CLI and MAGENTO_SHELL carry their own arguments, so both stay unquoted on purpose.
@@ -116,33 +121,44 @@ run_send_reminders() {
 }
 
 record_config() {
-    local path value
+    local path value status
     for path in "${CFG_PATHS[@]}"; do
         value="$(magento config:show "$CFG_PREFIX/$path" 2>/dev/null | head -1)"
+        status=$?
+        if [ "$status" -ne 0 ] || [ -z "$value" ]; then
+            value="$CFG_UNSET"
+        fi
         SAVED_CONFIG+=("$value")
     done
 }
 
 restore_config() {
-    local index failed=0
+    local index path value failed=0
     for index in "${!CFG_PATHS[@]}"; do
-        if ! magento config:set "$CFG_PREFIX/${CFG_PATHS[$index]}" "${SAVED_CONFIG[$index]}" \
-            >/dev/null 2>&1; then
-            printf 'Restore failed for %s/%s; set it yourself:\n' \
-                "$CFG_PREFIX" "${CFG_PATHS[$index]}" >&2
+        path="${CFG_PATHS[$index]}"
+        value="${SAVED_CONFIG[$index]}"
+        if [ "$value" = "$CFG_UNSET" ]; then
+            value="${CFG_DEFAULTS[$index]}"
+            printf 'Restored %s/%s to the module default %s; the installation had no explicit value.\n' \
+                "$CFG_PREFIX" "$path" "$value"
+        fi
+        if ! run_command "config:set $path" config:set "$CFG_PREFIX/$path" "$value"; then
+            printf 'Restore failed for %s/%s; set it yourself:\n' "$CFG_PREFIX" "$path" >&2
             print_saved_config >&2
             failed=1
         fi
     done
-    magento cache:flush >/dev/null
+    run_command "cache:flush" cache:flush || failed=1
 
     return "$failed"
 }
 
 print_saved_config() {
-    local index
+    local index value
     for index in "${!CFG_PATHS[@]}"; do
-        printf '  %s/%s = %s\n' "$CFG_PREFIX" "${CFG_PATHS[$index]}" "${SAVED_CONFIG[$index]}"
+        value="${SAVED_CONFIG[$index]}"
+        [ "$value" = "$CFG_UNSET" ] && value="(module default)"
+        printf '  %s/%s = %s\n' "$CFG_PREFIX" "${CFG_PATHS[$index]}" "$value"
     done
 }
 
