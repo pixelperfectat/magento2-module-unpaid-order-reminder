@@ -1,5 +1,5 @@
 {
-  "name": "Case 2 - an order at the delay boundary is selected exactly once",
+  "name": "Case 2 - an order one day past the delay is selected exactly once",
   "config": {
     "enabled": "1",
     "max_age_days": "30",

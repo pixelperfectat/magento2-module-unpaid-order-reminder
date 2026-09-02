@@ -1,5 +1,5 @@
 {
-  "name": "Case 18 - a gateway failure sends nothing and does not consume the one reminder",
+  "name": "Case 18 - a gateway failure writes no row and sends no mail",
   "config": {
     "enabled": "1",
     "max_age_days": "30",
