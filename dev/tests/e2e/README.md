@@ -182,9 +182,10 @@ script can prove on any installation; the rest stay manual, each for a reason.
 
 The reset command deletes an order only when its customer email ends in a reserved domain
 (`example.com`, `example.org`, `example.net`, `example.test`) **and** its state is `new` or
-`pending_payment`, which are the only states the suite ever produces. It deletes the quotes behind
-those orders on the same email rule. Nothing else is ever removed. That rule is what makes the suite
-safe against a database copied from production.
+`pending_payment`, which are the only states the suite ever produces. It deletes a quote on the
+email rule alone, because a quote has no state; an active cart on a reserved domain is removed
+too. Nothing else is ever removed. Those rules are what make the suite safe against a database
+copied from production.
 
 Nothing may leave the installation while the fixture module is enabled: it replaces the mail transport
 for the whole application, not only for this module's mail. That is a safety property here and a

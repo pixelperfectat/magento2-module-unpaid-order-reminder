@@ -121,10 +121,13 @@ run_send_reminders() {
 }
 
 record_config() {
-    local path value status
+    local path output value status
     for path in "${CFG_PATHS[@]}"; do
-        value="$(magento config:show "$CFG_PREFIX/$path" 2>/dev/null | head -1)"
+        # Captured whole, then trimmed: under pipefail a pipe into head would report its own
+        # status, and a value that exists must never be recorded as unset.
+        output="$(magento config:show "$CFG_PREFIX/$path" 2>/dev/null)"
         status=$?
+        value="$(printf '%s\n' "$output" | head -1)"
         if [ "$status" -ne 0 ] || [ -z "$value" ]; then
             value="$CFG_UNSET"
         fi
@@ -254,8 +257,11 @@ collected_mail() {
     mshell "cat $E2E_DIR/mails/*.eml 2>/dev/null" | perl -MMIME::QuotedPrint -pe '$_ = decode_qp($_)'
 }
 
+# The listing runs in the installation's own shell, where a missing directory still counts as zero,
+# so the directory is checked first.
 count_mail() {
     local count
+    mshell "test -d $E2E_DIR/mails" || return 1
     count="$(mshell "ls $E2E_DIR/mails/*.eml 2>/dev/null | wc -l")" || return 1
     printf '%s' "${count//[[:space:]]/}"
 }
@@ -270,7 +276,8 @@ assert_case_schema() {
         and (.config.rules | type == "object")
         and (.scenario | type == "object")
         and (.orders | type == "array" and length > 0)
-        and all(.orders[]; (.method | type == "string") and (.age_days | type == "number"))
+        and all(.orders[]; (.method | type == "string") and (.age_days | type == "number")
+            and (.count == null or (.count | type == "number")))
         and (.expect.reminder_rows | type == "number")
         and (.expect.mails | type == "number")
     ' "$1" >/dev/null 2>&1
@@ -316,8 +323,8 @@ run_case() {
 
     # Placing an order sends the order confirmation through the same collecting transport, and the
     # suite counts reminder mail only. This is the only file the runner removes and it is the
-    # suite's own.
-    mshell "rm -f $E2E_DIR/mails/*.eml"
+    # suite's own. The directory is created here so a case that expects no mail can still count.
+    mshell "mkdir -p $E2E_DIR/mails && rm -f $E2E_DIR/mails/*.eml"
 
     # The database may already hold reminders for orders the suite never created, so the
     # expectation is a difference and not an absolute count.
@@ -358,8 +365,11 @@ teardown() {
     local output status restore_status
     output="$(magento pixelperfect:unpaidorder:e2e-reset 2>&1)"
     status=$?
+    # The restore records its failures the way a case does, so they are printed the same way.
+    reset_failures
     restore_config
     restore_status=$?
+    [ "$restore_status" -ne 0 ] && report_failures "teardown"
     if [ "$status" -ne 0 ]; then
         printf 'Teardown failed: e2e-reset: exit %s: %s\n' \
             "$status" "$(printf '%s\n' "$output" | head -1)" >&2
