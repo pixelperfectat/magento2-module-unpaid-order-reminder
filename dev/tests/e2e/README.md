@@ -30,6 +30,9 @@ the decoded mail body and the command's own exit status.
 
 ## Install the fixture module
 
+The suite exists in a git checkout only: `.gitattributes` excludes `dev/` from the Composer dist
+archive, so a package installed with Composer does not carry it.
+
     cp -R dev/fixtures/PixelPerfect <magento-root>/app/code/
     <magento-root>/bin/magento module:enable PixelPerfect_UnpaidOrderReminderE2e
     <magento-root>/bin/magento setup:upgrade
