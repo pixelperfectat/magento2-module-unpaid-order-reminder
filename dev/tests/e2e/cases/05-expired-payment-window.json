@@ -1,0 +1,20 @@
+{
+  "name": "Case 5 - an order whose payment window has closed is skipped",
+  "config": {
+    "enabled": "1",
+    "max_age_days": "0",
+    "rules": { "checkmo": { "delay_days": 5, "email_template": "unpaid_order_reminder_default" } }
+  },
+  "scenario": {
+    "kind": "bank",
+    "bank_name": "Example Bank",
+    "bank_account": "NL10TEST000100100",
+    "bank_bic": "TESTNL10",
+    "reference": "RF00-0000-0000-0005",
+    "expires_at": "2020-01-01 00:00:00",
+    "payment_url": "https://example.com/pay/case-05"
+  },
+  "orders": [ { "method": "checkmo", "age_days": 10, "count": 1 } ],
+  "runs": 1,
+  "expect": { "reminder_rows": 0, "mails": 0 }
+}
