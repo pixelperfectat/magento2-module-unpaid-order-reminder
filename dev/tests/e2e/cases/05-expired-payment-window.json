@@ -16,5 +16,5 @@
   },
   "orders": [ { "method": "checkmo", "age_days": 10, "count": 1 } ],
   "runs": 1,
-  "expect": { "reminder_rows": 0, "mails": 0 }
+  "expect": { "reminder_rows": 0, "mails": 0, "exit_status": 1 }
 }
