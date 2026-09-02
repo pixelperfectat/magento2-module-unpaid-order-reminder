@@ -284,6 +284,11 @@ run_case() {
         return 1
     fi
 
+    # Placing an order sends the order confirmation through the same collecting transport, and the
+    # suite counts reminder mail only. This is the only file the runner removes and it is the
+    # suite's own.
+    mshell "rm -f $E2E_DIR/mails/*.eml"
+
     # The database may already hold reminders for orders the suite never created, so the
     # expectation is a difference and not an absolute count.
     before="$(count_reminder_rows)"
