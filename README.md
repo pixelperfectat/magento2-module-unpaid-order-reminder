@@ -77,7 +77,9 @@ A scripted suite under `dev/` proves the reminder against a real Magento install
 real selection run, the real templates. It sends nothing — a fixture module captures every message to
 disk — and it deletes only orders addressed to an RFC 2606 reserved domain. Nothing under `dev/` is
 autoloaded or enabled by installing this package; the fixture module is copied into `app/code` by hand
-and only ever on a development installation. See [`dev/tests/e2e/README.md`](dev/tests/e2e/README.md).
+and only ever on a development installation. That step stays manual on purpose: the runner never
+writes to `app/code` and never runs `setup:upgrade`, because both change the installation's own
+configuration files. See [`dev/tests/e2e/README.md`](dev/tests/e2e/README.md).
 
 ## Licence
 
