@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-02
+
 ### Added
 
 - An end-to-end suite under `dev/`, with a fixture module, a scenario-driven instructions provider,
@@ -14,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ReminderLogRepositoryInterface::deleteByOrderId(int $orderId): bool`, which deletes the reminder log
   row of an order and reports whether there was one. The end-to-end teardown has to remove what it
   created; without it, the only way to do that was to reach into the table.
+
+### Upgrade note
+
+`ReminderLogRepositoryInterface` gained `deleteByOrderId()`. A custom implementation of that
+contract must add it. The `dev/` directory (the end-to-end suite and its fixture module) is
+excluded from the Composer dist archive; the suite runs from a git checkout only.
 
 ## [0.3.0] - 2026-09-01
 
