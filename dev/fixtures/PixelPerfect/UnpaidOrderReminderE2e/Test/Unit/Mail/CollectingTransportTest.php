@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace PixelPerfect\UnpaidOrderReminderE2e\Test\Unit\Mail;
 
+use Magento\Framework\App\State;
+use Magento\Framework\Exception\MailException;
 use Magento\Framework\Filesystem;
 use Magento\Framework\Filesystem\Directory\WriteInterface;
 use Magento\Framework\Mail\EmailMessageInterface;
@@ -21,6 +23,8 @@ class CollectingTransportTest extends TestCase
     private $message;
     /** @var DateTime|MockObject */
     private $dateTime;
+    /** @var State|MockObject */
+    private $appState;
 
     protected function setUp(): void
     {
@@ -30,13 +34,27 @@ class CollectingTransportTest extends TestCase
         $this->dateTime = $this->createMock(DateTime::class);
         $this->dateTime->method('gmtTimestamp')->willReturn(1700000000);
         $this->filesystem->method('getDirectoryWrite')->willReturn($this->varDirectory);
+        $this->appState = $this->createMock(State::class);
+        $this->appState->method('getMode')->willReturn(State::MODE_DEVELOPER);
     }
 
     public function testGetMessageReturnsTheMessageItWasBuiltWith(): void
     {
-        $transport = new CollectingTransport($this->message, $this->filesystem, $this->dateTime);
+        $transport = $this->transport();
 
         $this->assertSame($this->message, $transport->getMessage());
+    }
+
+    public function testSendMessageRefusesOutsideDeveloperMode(): void
+    {
+        $appState = $this->createMock(State::class);
+        $appState->method('getMode')->willReturn(State::MODE_PRODUCTION);
+        $this->varDirectory->expects($this->never())->method('writeFile');
+
+        $this->expectException(MailException::class);
+        $this->expectExceptionMessage('The collecting mail transport runs in developer mode only.');
+
+        (new CollectingTransport($this->message, $this->filesystem, $this->dateTime, $appState))->sendMessage();
     }
 
     public function testSendMessageWritesTheWholeMessageToTheMailDirectory(): void
@@ -50,7 +68,7 @@ class CollectingTransportTest extends TestCase
                 "Subject: Reminder\r\n\r\nBody text"
             );
 
-        (new CollectingTransport($this->message, $this->filesystem, $this->dateTime))->sendMessage();
+        $this->transport()->sendMessage();
     }
 
     public function testTwoMessagesAreWrittenToTwoDifferentFiles(): void
@@ -64,11 +82,16 @@ class CollectingTransportTest extends TestCase
             }
         );
 
-        $transport = new CollectingTransport($this->message, $this->filesystem, $this->dateTime);
+        $transport = $this->transport();
         $transport->sendMessage();
         $transport->sendMessage();
 
         $this->assertCount(2, $written);
         $this->assertNotSame($written[0], $written[1]);
+    }
+
+    private function transport(): CollectingTransport
+    {
+        return new CollectingTransport($this->message, $this->filesystem, $this->dateTime, $this->appState);
     }
 }

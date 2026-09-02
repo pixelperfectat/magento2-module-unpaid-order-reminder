@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace PixelPerfect\UnpaidOrderReminderE2e\Mail;
 
 use Magento\Framework\App\Filesystem\DirectoryList;
+use Magento\Framework\App\State;
 use Magento\Framework\Exception\FileSystemException;
 use Magento\Framework\Exception\MailException;
 use Magento\Framework\Filesystem;
@@ -37,11 +38,13 @@ class CollectingTransport implements TransportInterface
      * @param MessageInterface $message
      * @param Filesystem $filesystem
      * @param DateTime $dateTime
+     * @param State $appState
      */
     public function __construct(
         private readonly MessageInterface $message,
         private readonly Filesystem $filesystem,
-        private readonly DateTime $dateTime
+        private readonly DateTime $dateTime,
+        private readonly State $appState
     ) {
     }
 
@@ -53,6 +56,13 @@ class CollectingTransport implements TransportInterface
      */
     public function sendMessage(): void
     {
+        // This transport replaces the application's own, so a fixture module left enabled by
+        // accident would swallow every message the installation sends. Outside developer mode it
+        // refuses loudly rather than silently collecting production mail.
+        if ($this->appState->getMode() !== State::MODE_DEVELOPER) {
+            throw new MailException(__('The collecting mail transport runs in developer mode only.'));
+        }
+
         $content = $this->message instanceof EmailMessageInterface
             ? $this->message->toString()
             : (string)$this->message->getBody();
