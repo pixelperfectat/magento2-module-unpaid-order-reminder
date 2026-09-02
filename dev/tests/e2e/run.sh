@@ -58,6 +58,37 @@ require_tools() {
     command -v perl >/dev/null 2>&1 || { echo "perl is required"; exit 2; }
 }
 
+# Both conditions are what keeps the run inside this installation: the fixture module binds the
+# transport that captures the mail, and every fixture command refuses to run outside developer mode.
+# Without the module the first send would reach real recipients, so this is checked before anything
+# else touches the installation.
+preflight() {
+    local output
+    output="$(magento module:status PixelPerfect_UnpaidOrderReminderE2e 2>&1)"
+    case "$output" in
+        *disabled*)
+            echo "The fixture module PixelPerfect_UnpaidOrderReminderE2e is disabled; enable it first."
+            exit 2
+            ;;
+    esac
+    case "$output" in
+        *enabled*) ;;
+        *)
+            echo "The fixture module PixelPerfect_UnpaidOrderReminderE2e is not installed."
+            exit 2
+            ;;
+    esac
+
+    output="$(magento deploy:mode:show 2>&1)"
+    case "$output" in
+        *developer*) ;;
+        *)
+            echo "The installation is not in developer mode; the fixture commands refuse to run."
+            exit 2
+            ;;
+    esac
+}
+
 # Runs a Magento command and records a case failure when it fails, so the operator sees the real
 # cause instead of an assertion about a count that was never going to be right.
 run_command() {
@@ -241,6 +272,7 @@ main() {
     require_tools
     local failed=0 case_file
     printf 'Unpaid order reminder end-to-end suite\n\n'
+    preflight
     record_config
     for case_file in "$HERE"/cases/*.json; do
         run_case "$case_file" || failed=1
