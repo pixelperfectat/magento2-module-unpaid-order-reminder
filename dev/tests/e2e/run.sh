@@ -239,10 +239,12 @@ place_orders() {
 }
 
 # The stats command prints nothing countable until the first reminder exists, which reads as zero.
+# A command that failed outright is a different thing and is reported as unreadable, so a case never
+# compares against a count that was never obtained.
 count_reminder_rows() {
-    local count
-    count="$(magento pixelperfect:unpaidorder:reminder-stats 2>/dev/null \
-        | grep -oE 'Reminded[^0-9]*[0-9]+' | grep -oE '[0-9]+' | head -1)"
+    local output count
+    output="$(magento pixelperfect:unpaidorder:reminder-stats 2>/dev/null)" || return 1
+    count="$(printf '%s\n' "$output" | grep -oE 'Reminded[^0-9]*[0-9]+' | grep -oE '[0-9]+' | head -1)"
     printf '%s' "${count:-0}"
 }
 
@@ -252,11 +254,16 @@ collected_mail() {
     mshell "cat $E2E_DIR/mails/*.eml 2>/dev/null" | perl -MMIME::QuotedPrint -pe '$_ = decode_qp($_)'
 }
 
-count_mail() { mshell "ls $E2E_DIR/mails/*.eml 2>/dev/null | wc -l" | tr -d ' '; }
+count_mail() {
+    local count
+    count="$(mshell "ls $E2E_DIR/mails/*.eml 2>/dev/null | wc -l")" || return 1
+    printf '%s' "${count//[[:space:]]/}"
+}
 
 run_case() {
     local case_file="$1"
-    local name runs i before after exit_status
+    local name runs i before after mails exit_status
+    local counted_before=1 counted_after=1
     name="$(jq -r '.name' "$case_file")"
     runs="$(jq -r '.runs // 1' "$case_file")"
     exit_status="$(jq -r '.expect.exit_status // 0' "$case_file")"
@@ -291,14 +298,24 @@ run_case() {
 
     # The database may already hold reminders for orders the suite never created, so the
     # expectation is a difference and not an absolute count.
-    before="$(count_reminder_rows)"
+    before="$(count_reminder_rows)" || counted_before=0
     for ((i = 0; i < runs; i++)); do
         run_send_reminders "$exit_status"
     done
-    after="$(count_reminder_rows)"
+    after="$(count_reminder_rows)" || counted_after=0
 
-    assert_equals "reminder rows" "$(jq -r '.expect.reminder_rows' "$case_file")" "$((after - before))"
-    assert_equals "mails" "$(jq -r '.expect.mails' "$case_file")" "$(count_mail)"
+    if [ "$counted_before" = "1" ] && [ "$counted_after" = "1" ]; then
+        assert_equals "reminder rows" \
+            "$(jq -r '.expect.reminder_rows' "$case_file")" "$((after - before))"
+    else
+        add_failure "reminder rows: the reminder count could not be read"
+    fi
+
+    if mails="$(count_mail)"; then
+        assert_equals "mails" "$(jq -r '.expect.mails' "$case_file")" "$mails"
+    else
+        add_failure "mails: the captured mail could not be counted"
+    fi
 
     local body needle
     body="$(collected_mail)"
