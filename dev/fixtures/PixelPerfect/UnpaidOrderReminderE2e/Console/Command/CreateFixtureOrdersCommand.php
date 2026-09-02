@@ -8,6 +8,7 @@ use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\CatalogInventory\Helper\Stock;
 use Magento\Framework\App\Area;
+use Magento\Framework\App\AreaList;
 use Magento\Framework\App\State;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Stdlib\DateTime\DateTime;
@@ -42,6 +43,7 @@ class CreateFixtureOrdersCommand extends Command
 
     /**
      * @param State $appState
+     * @param AreaList $areaList
      * @param QuoteFactory $quoteFactory
      * @param CartRepositoryInterface $quoteRepository
      * @param CartManagementInterface $cartManagement
@@ -56,6 +58,7 @@ class CreateFixtureOrdersCommand extends Command
      */
     public function __construct(
         private readonly State $appState,
+        private readonly AreaList $areaList,
         private readonly QuoteFactory $quoteFactory,
         private readonly CartRepositoryInterface $quoteRepository,
         private readonly CartManagementInterface $cartManagement,
@@ -157,6 +160,9 @@ class CreateFixtureOrdersCommand extends Command
             $this->appState->getAreaCode();
         } catch (LocalizedException) {
             $this->appState->setAreaCode(Area::AREA_FRONTEND);
+            // The area code alone does not load the area's own di.xml, so placement would otherwise
+            // run against the console's object configuration rather than the storefront's.
+            $this->areaList->getArea(Area::AREA_FRONTEND)->load(Area::PART_CONFIG);
         }
     }
 
