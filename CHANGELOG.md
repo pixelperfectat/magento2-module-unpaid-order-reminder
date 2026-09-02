@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-02
+
+### Added
+
+- German (`de_DE`) and Italian (`it_IT`) translations for every string of the reminder email, including
+  the subject, and German translations for the admin configuration strings.
+
+### Changed
+
+- The bank block labels in the email template are now "Account number", "Payment reference" and
+  "Amount due" instead of "Account", "Reference" and "Amount". The one-word keys are translated by
+  other packages and by themes, which override a module's own translations, so the reminder could
+  not control its wording. Themes that translated the old keys need the new ones.
+
 ## [0.4.0] - 2026-09-02
 
 ### Added
