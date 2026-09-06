@@ -3,8 +3,12 @@
     <acl>
         <resources>
             <resource id="Magento_Backend::admin">
-                <resource id="Magento_Config::config">
-                    <resource id="PixelPerfect_UnpaidOrderReminder::config" title="Unpaid Order Reminder" sortOrder="500"/>
+                <resource id="Magento_Backend::stores">
+                    <resource id="Magento_Backend::stores_settings">
+                        <resource id="Magento_Config::config">
+                            <resource id="PixelPerfect_UnpaidOrderReminder::config" title="Unpaid Order Reminder" sortOrder="500"/>
+                        </resource>
+                    </resource>
                 </resource>
             </resource>
         </resources>
