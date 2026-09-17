@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-09-17
+
+### Fixed
+
+- The module no longer breaks admin login. Its ACL declared `Magento_Config::config` directly under
+  `Magento_Backend::admin`, while Magento declares it under `Magento_Backend::stores` and
+  `Magento_Backend::stores_settings`. The merged ACL then carried the resource twice, and the ACL builder
+  threw "Resource id 'Magento_Config::config' already exists in the ACL" on every login attempt, locking
+  every administrator out of the backend. In developer mode the same defect surfaced earlier, as an invalid
+  merged XML document. (84dcb5a)
+
 ## [0.4.1] - 2026-09-02
 
 ### Added
