@@ -105,6 +105,55 @@ class RulesTest extends TestCase
     }
 
     /**
+     * The table renders the field value as rows. A stored JSON string renders no rows, and the next
+     * save then posts the empty table and wipes the saved rules.
+     */
+    public function testAfterLoadTurnsTheStoredValueIntoTableRows(): void
+    {
+        $rules = $this->rulesWithValue('{"mollie_methods_banktransfer":{"delay_days":5,"email_template":"tpl_a"}}');
+
+        $rules->afterLoad();
+
+        $this->assertSame(
+            ['_mollie_methods_banktransfer' => [
+                'payment_method' => 'mollie_methods_banktransfer',
+                'delay_days' => '5',
+                'email_template' => 'tpl_a',
+            ]],
+            $rules->getValue()
+        );
+    }
+
+    public function testLoadedRowsSaveBackToTheSameValue(): void
+    {
+        $stored = '{"banktransfer":{"delay_days":7,"email_template":"tpl_a"},"checkmo":{"delay_days":5,"email_template":"tpl_b"}}';
+        $rules = $this->rulesWithValue($stored);
+
+        $rules->afterLoad();
+        $rules->beforeSave();
+
+        $this->assertSame($stored, $rules->getValue());
+    }
+
+    public function testAfterLoadTurnsAnEmptyObjectIntoNoRows(): void
+    {
+        $rules = $this->rulesWithValue('{}');
+
+        $rules->afterLoad();
+
+        $this->assertSame([], $rules->getValue());
+    }
+
+    public function testAfterLoadLeavesAnUnreadableValueAlone(): void
+    {
+        $rules = $this->rulesWithValue('not json');
+
+        $rules->afterLoad();
+
+        $this->assertSame('not json', $rules->getValue());
+    }
+
+    /**
      * @param array<string, array<string, string>>|string $value
      * @return Rules
      */
@@ -121,6 +170,16 @@ class RulesTest extends TestCase
         $serializer = $this->createMock(SerializerInterface::class);
         $serializer->method('serialize')->willReturnCallback(
             static fn (mixed $data): string => json_encode($data, JSON_THROW_ON_ERROR)
+        );
+        $serializer->method('unserialize')->willReturnCallback(
+            // Magento's Json serializer reports bad input as InvalidArgumentException.
+            static function (string $data): mixed {
+                $decoded = json_decode($data, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    throw new \InvalidArgumentException('Unable to unserialize value.');
+                }
+                return $decoded;
+            }
         );
         $property = new \ReflectionProperty(Rules::class, 'serializer');
         $property->setAccessible(true);
