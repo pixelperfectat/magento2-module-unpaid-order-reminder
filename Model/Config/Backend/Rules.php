@@ -51,6 +51,45 @@ class Rules extends Value
     }
 
     /**
+     * Turn the stored value back into table rows, so the admin form shows the saved rules.
+     *
+     * Without this the form renders an empty table, and the next save of the section wipes the rules.
+     *
+     * @return $this
+     */
+    protected function _afterLoad(): self
+    {
+        $value = $this->getValue();
+        if (!is_string($value) || $value === '') {
+            return parent::_afterLoad();
+        }
+
+        try {
+            $stored = $this->serializer->unserialize($value);
+        } catch (\InvalidArgumentException) {
+            return parent::_afterLoad();
+        }
+        if (!is_array($stored)) {
+            return parent::_afterLoad();
+        }
+
+        $rows = [];
+        foreach ($stored as $method => $rule) {
+            if (!is_array($rule)) {
+                continue;
+            }
+            $rows['_' . $method] = [
+                'payment_method' => (string)$method,
+                'delay_days' => (string)($rule['delay_days'] ?? ''),
+                'email_template' => (string)($rule['email_template'] ?? ''),
+            ];
+        }
+        $this->setValue($rows);
+
+        return parent::_afterLoad();
+    }
+
+    /**
      * Re-key the submitted rows by payment method and validate them before the value is persisted.
      *
      * @return $this
