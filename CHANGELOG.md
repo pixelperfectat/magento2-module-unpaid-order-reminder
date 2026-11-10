@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-11-10
+
+### Fixed
+
+- Saved reminder rules now show in the admin configuration, so saving the section again no longer deletes them
+
 ## [0.4.2] - 2026-09-17
 
 ### Fixed
